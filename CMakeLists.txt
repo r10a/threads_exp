@@ -1,12 +1,12 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.5)
 project(threads_exp C)
 
-set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -lrt")
 
 find_package( Threads REQUIRED )
 
-add_executable(threads_exp main.c)
+add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
 
 target_link_libraries(threads_exp Threads::Threads)
 

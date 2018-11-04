@@ -5,208 +5,136 @@
 
 */
 
-
+// System headers
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
-#include <mqueue.h>
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <asm/errno.h>
 
-#define PROD_Q "/prod_q"
-#define CONS_Q "/cons_q"
-#define OKTOWRITE "/condwrite"
-#define MESSAGE "/msg"
-#define MUTEX "/mutex_lock"
-#define MAX_MESSAGES 10
-#define MAX_MSG_SIZE 256
-#define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
-#define QUEUE_PERMISSIONS 0660
+//Own headers
+#include "ArrayQueue.h"
 
-pthread_mutex_t *the_mutex;
+#define N_NUM_THREADS 10
+#define M_NUM_REQS 1
+
+int shr_req_q_1, shr_cond_1, shr_mutex_1;
+Queue *req_q_1, *resp_q_1;
+
+pthread_mutex_t *mutex_1;
 pthread_mutexattr_t mattr;
 
-pthread_cond_t *condc, condp;
+pthread_cond_t *cond_1;
 pthread_condattr_t cattr;
 
-int mem_mutex, mem_cond;
 
-char in_buffer[MSG_BUFFER_SIZE];
-char out_buffer[MSG_BUFFER_SIZE];
-char print_buffer[MSG_BUFFER_SIZE];
+typedef struct r_req {
+    void* address;
+    int size;
+} r_req;
 
+typedef struct w_req {
+    void *address;
+    int size;
+} w_req;
 
-void *producer(void *ptr) {
+void *create_send_request(void *);
 
-    write(1, "\nSlept: ", 8);
-    write(1, sleep(5), 1);
+int print(char *);
 
-    struct mq_attr attr;
-    mqd_t qd_prod;
-    attr.mq_flags = 0;
-    attr.mq_maxmsg = MAX_MESSAGES;
-    attr.mq_msgsize = MAX_MSG_SIZE;
-    attr.mq_curmsgs = 0;
+int print_int(int);
 
-    /*sprintf(print_buffer, "%p", &the_mutex);
-    write(1, print_buffer, strlen(print_buffer));*/
+int share(int* share, char* path, int size);
 
-    if ((qd_prod = mq_open(PROD_Q, O_WRONLY | O_NONBLOCK | O_CREAT, QUEUE_PERMISSIONS, &attr)) == -1) {
-        perror("Prod: mq_open (prod)");
-        exit(1);
-    }
-
-    sprintf(out_buffer, "%d", 1550);
-
-    sprintf(print_buffer, "\n%d", pthread_mutex_lock(the_mutex));	/* protect buffer */
-    write(1, print_buffer, strlen(print_buffer)+1);
-
-    while (1) {
-        if (mq_send(qd_prod, out_buffer, strlen(out_buffer) + 1, 0) == -1) {
-            perror("Prod: Not able to send message to client");
-            continue;
-        } else break;
-    }
-
-    pthread_cond_signal(condc);	/* wake up consumer */
-    pthread_mutex_unlock(the_mutex);	/* release the buffer */
-
-    mq_close(qd_prod);
-    pthread_exit(0);
-}
-
-void *consumer(void *ptr) {
-
-    mqd_t qd_cons;
-    struct mq_attr attr;
-
-    attr.mq_flags = 0;
-    attr.mq_maxmsg = MAX_MESSAGES;
-    attr.mq_msgsize = MAX_MSG_SIZE;
-    attr.mq_curmsgs = 0;
-
-    /*sprintf(print_buffer, "%p", &the_mutex);
-    write(1, print_buffer, strlen(print_buffer));*/
-
-    if ((qd_cons = mq_open(PROD_Q, O_RDONLY | O_NONBLOCK | O_CREAT, QUEUE_PERMISSIONS, &attr)) == -1) {
-        perror("Cons: mq_open (prod)");
-        exit(1);
-    }
-
-    sprintf(print_buffer, "%d", pthread_mutex_lock(the_mutex));	/* protect buffer */
-    write(1, print_buffer, strlen(print_buffer));
-
-    memset(in_buffer, 0, sizeof(in_buffer));
-
-    while(mq_receive(qd_cons, in_buffer, MSG_BUFFER_SIZE, NULL) == EAGAIN) {
-        pthread_cond_wait(condc, the_mutex);
-    }
-
-   /* while (1) {
-        if (mq_receive(qd_cons, in_buffer, MSG_BUFFER_SIZE, NULL) == -1) {
-            perror("Cons: mq_receive");
-        } else break;
-    }*/
-    write(1, "\nIn buffer: ", 12);
-    write(1, in_buffer, strlen(in_buffer));
-    pthread_mutex_unlock(the_mutex);	/* release the buffer */
-
-    mq_close(qd_cons);
-    pthread_exit(0);
-}
+void cleanup();
 
 int main(int argc, char **argv) {
-    pthread_t pro, con;
-    int pid, pid_1, pid_2, status;
-    int mode = S_IRWXU | S_IRWXG;
+    int pid_1, pid_2, pid_3, i;
 
-    mem_mutex = shm_open(MUTEX, O_CREAT | O_RDWR | O_TRUNC, mode);
+    Queue *req_q_1 = createQueue(M_NUM_REQS * N_NUM_THREADS);
 
-    if (mem_mutex < 0) {
-        perror("failure on shm_open on des_mutex");
-        exit(1);
-    }
-    if (ftruncate(mem_mutex, sizeof(pthread_mutex_t)) == -1) {
-        perror("Error on ftruncate to sizeof pthread_cond_t\n");
-        exit(-1);
-    }
+    mutex_1 = (pthread_mutex_t*) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_1, "/mutex_1", sizeof(pthread_mutex_t)), 0);
+    cond_1 = (pthread_cond_t*) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_1, "/cond_1", sizeof(pthread_cond_t)), 0);
 
-    the_mutex = (pthread_mutex_t*) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, mem_mutex, 0);
-
-    mem_cond = shm_open(OKTOWRITE, O_CREAT | O_RDWR | O_TRUNC, mode);
-
-    if (mem_cond < 0) {
-        perror("failure on shm_open on mem_cond");
-        exit(1);
-    }
-
-    if (ftruncate(mem_cond, sizeof(pthread_cond_t)) == -1) {
-        perror("Error on ftruncate to sizeof pthread_cond_t\n");
-        exit(-1);
-    }
-    condc = (pthread_cond_t*) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, mem_cond, 0);
-
-    // Initialize the mutex and condition variables
     pthread_mutexattr_init(&mattr);
     pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-    pthread_mutex_init(the_mutex, &mattr);
+    pthread_mutex_init(mutex_1, &mattr);
     pthread_mutexattr_destroy(&mattr);
 
     pthread_condattr_init(&cattr);
     pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
-    pthread_cond_init(condc, &cattr);        /* Initialize consumer condition variable */
-    pthread_cond_init(&condp, &cattr);        /* Initialize producer condition variable */
+    pthread_cond_init(cond_1, &cattr);        /* Initialize condition variable */
     pthread_condattr_destroy(&cattr);
 
-//    printf("\nHello from parent process!");
-    write(1, "\nParent", 7);
-    /*sprintf(print_buffer, "%p", &the_mutex);
-    write(1, print_buffer, strlen(print_buffer));*/
+    share(&shr_req_q_1, "/req_q_1", sizeof(*req_q_1));
+    req_q_1 = (Queue*) mmap(NULL, sizeof(*req_q_1), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    req_q_1 = createQueue(M_NUM_REQS * N_NUM_THREADS);
 
+    print_int(req_q_1->capacity);
 
-    //Create child processes
-    if ((pid_1 = fork()) == 0) {  /*Child process*/
+    if((pid_1 = fork()) == 0) { /* Child Process*/
 
-        write(1, "\nprocess 1", 10);
+        pthread_t threads[N_NUM_THREADS];
+        print("\nprocess 1 created");
 
-        pthread_create(&pro, NULL, producer, NULL);
-        pthread_join(pro, NULL);
-        exit(0);
-
-    } else {  /*Create process 2 in parent*/
-
-        if ((pid_2 = fork()) == 0) {  /*Child process*/
-
-            write(1, "\nprocess 2", 10);
-            pthread_create(&con, NULL, consumer, NULL);
-            pthread_join(con, NULL);
-            exit(0);
+        for(i = 0; i < N_NUM_THREADS; i++) {
+            pthread_create(&threads[i], NULL, create_send_request, req_q_1);
         }
+        for(i = 0; i < N_NUM_THREADS; i++){
+            pthread_join(threads[i], NULL);
+        }
+        while(!isEmpty(req_q_1)) {
+            print_int(dequeue(req_q_1));
+        }
+        exit(0);
     }
-//    printf("%d", pid_1);
+
+    cleanup();
+}
 
 
-    // Create the threads
-//    pthread_create(&con, NULL, consumer, NULL);
-//    pthread_create(&pro, NULL, producer, NULL);
+void *create_send_request(void *ptr) {
+    pthread_mutex_lock(mutex_1);
+    Queue *queue = (Queue*) ptr;
+    print("\ncreating request");
+    enqueue(queue, pthread_self());
+    pthread_mutex_unlock(mutex_1);
+}
 
-    // Wait for the threads to finish
-    // Otherwise main might run to the end
-    // and kill the entire process when it exits.
-//    pthread_join(con, NULL);
-//    pthread_join(pro, NULL);
-    while ((pid = wait(&status)) > 0);
-//    printf("\nIn Buffer is: %s", in_buffer);
+int print(char *str) {
+    write(1, str, strlen(str));
+}
 
-    // Cleanup -- would happen automatically at end of program
-    pthread_mutex_destroy(the_mutex);    /* Free up the_mutex */
-    pthread_cond_destroy(condc);        /* Free up consumer condition variable */
-    pthread_cond_destroy(&condp);        /* Free up producer condition variable */
-    shm_unlink(MUTEX);
+int print_int(int num) {
+    char number[20];
+    sprintf(number, "\n%d", num);
+    print(number);
+}
 
+int share(int* share, char* path, int size) {
+    *share = shm_open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
+
+    if (*share < 0) {
+        perror("failure on shm_open");
+        exit(1);
+    }
+    if (ftruncate(*share, size) == -1) {
+        perror("Error on ftruncate\n");
+        exit(-1);
+    }
+    return *share;
+}
+
+
+void cleanup() {
+    shm_unlink("/mutex_1");
+    shm_unlink("/req_q_1");
+    shm_unlink("/cond_1");
+    pthread_mutex_destroy(mutex_1);    /* Free up the_mutex */
+    pthread_cond_destroy(cond_1);        /* Free up consumer condition variable */
 }
