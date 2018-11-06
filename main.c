@@ -101,48 +101,27 @@ int print_int(int);
 
 int share(int *share, char *path, int size);
 
+void init_mutex_cond();
+
 void cleanup();
 
 int main(int argc, char **argv) {
     int pid_1, pid_2, pid_3, i;
 
-//    Queue *dummy = createQueue(M_NUM_REQS * N_NUM_THREADS);
+    /* Map Mutex to shared memory */ /* Map Condition to shared memory */
+    mutex_1 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_1, MUTEX_1, sizeof(pthread_mutex_t)), 0);
+    cond_1 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_1, CONDITION_1, sizeof(pthread_cond_t)), 0);
 
-    mutex_1 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                       share(&shr_mutex_1, MUTEX_1, sizeof(pthread_mutex_t)), 0);
-    cond_1 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                     share(&shr_cond_1, CONDITION_1, sizeof(pthread_cond_t)), 0);
+    mutex_2 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_2, MUTEX_2, sizeof(pthread_mutex_t)), 0);
+    cond_2 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_2, CONDITION_2, sizeof(pthread_cond_t)), 0);
 
-    mutex_2 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                       share(&shr_mutex_2, MUTEX_2, sizeof(pthread_mutex_t)), 0);
-    cond_2 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                     share(&shr_cond_2, CONDITION_2, sizeof(pthread_cond_t)), 0);
+    mutex_3 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_3, MUTEX_3, sizeof(pthread_mutex_t)), 0);
+    cond_3 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_3, CONDITION_3, sizeof(pthread_cond_t)), 0);
 
-    mutex_3 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                       share(&shr_mutex_3, MUTEX_3, sizeof(pthread_mutex_t)), 0);
-    cond_3 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                     share(&shr_cond_3, CONDITION_3, sizeof(pthread_cond_t)), 0);
+    mutex_4 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_4, MUTEX_4, sizeof(pthread_mutex_t)), 0);
+    cond_4 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_4, CONDITION_4, sizeof(pthread_cond_t)), 0);
 
-    mutex_4 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                       share(&shr_mutex_4, MUTEX_4, sizeof(pthread_mutex_t)), 0);
-    cond_4 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                     share(&shr_cond_4, CONDITION_4, sizeof(pthread_cond_t)), 0);
-
-    pthread_mutexattr_init(&mattr);
-    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-    pthread_mutex_init(mutex_1, &mattr);    /* Initialize mutex variable */
-    pthread_mutex_init(mutex_2, &mattr);    /* Initialize mutex variable */
-    pthread_mutex_init(mutex_3, &mattr);    /* Initialize mutex variable */
-    pthread_mutex_init(mutex_4, &mattr);    /* Initialize mutex variable */
-    pthread_mutexattr_destroy(&mattr);
-
-    pthread_condattr_init(&cattr);
-    pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
-    pthread_cond_init(cond_1, &cattr);  /* Initialize condition variable */
-    pthread_cond_init(cond_2, &cattr);  /* Initialize condition variable */
-    pthread_cond_init(cond_3, &cattr);  /* Initialize condition variable */
-    pthread_cond_init(cond_4, &cattr);  /* Initialize condition variable */
-    pthread_condattr_destroy(&cattr);
+    init_mutex_cond();
 
     share(&shr_req_q_1, REQ_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
     req_q_1 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_req_q_1, 0);
@@ -195,9 +174,6 @@ int main(int argc, char **argv) {
         for (i = 0; i < N_NUM_THREADS; i++) {
             pthread_join(threads[i], NULL);
         }
-        while (!isEmpty(resp_q_1)) {
-            print_int(dequeue(resp_q_1));
-        }
         exit(0);
     } else if ((pid_2 = fork()) == 0) {  /* Child Process 2 */
         pthread_t threads[N_NUM_THREADS];
@@ -210,7 +186,7 @@ int main(int argc, char **argv) {
             pthread_join(threads[i], NULL);
         }
         exit(0);
-    } else if ((pid_2 = fork()) == 0) {  /* Child Process 3 */
+    } else if ((pid_3 = fork()) == 0) {  /* Child Process 3 */
         pthread_t threads[N_NUM_THREADS];
         print("\nprocess 3 created");
 
@@ -370,6 +346,24 @@ int share(int *share, char *path, int size) {
         exit(-1);
     }
     return *share;
+}
+
+void init_mutex_cond() {
+    pthread_mutexattr_init(&mattr);
+    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(mutex_1, &mattr);    /* Initialize mutex variable */
+    pthread_mutex_init(mutex_2, &mattr);    /* Initialize mutex variable */
+    pthread_mutex_init(mutex_3, &mattr);    /* Initialize mutex variable */
+    pthread_mutex_init(mutex_4, &mattr);    /* Initialize mutex variable */
+    pthread_mutexattr_destroy(&mattr);
+
+    pthread_condattr_init(&cattr);
+    pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+    pthread_cond_init(cond_1, &cattr);  /* Initialize condition variable */
+    pthread_cond_init(cond_2, &cattr);  /* Initialize condition variable */
+    pthread_cond_init(cond_3, &cattr);  /* Initialize condition variable */
+    pthread_cond_init(cond_4, &cattr);  /* Initialize condition variable */
+    pthread_condattr_destroy(&cattr);
 }
 
 
