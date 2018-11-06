@@ -11,7 +11,7 @@
 typedef struct Queue {
     int front, rear, size;
     unsigned capacity;
-    int *array;
+    int array[20];
 } Queue;
 
 // function to create a queue of given capacity.
