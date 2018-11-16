@@ -6,7 +6,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -lrt")
 
 find_package( Threads REQUIRED )
 
-add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
+#add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
+
+add_executable(threads_exp main.c CircularQueue.c CircularQueue.h utils.c utils.h)
 
 target_link_libraries(threads_exp Threads::Threads)
 

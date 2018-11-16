@@ -22,9 +22,10 @@
 #define gettid() syscall(SYS_gettid)
 
 //Own headers
-#include "ArrayQueue.h"
+//#include "ArrayQueue.h"
+#include "CircularQueue.h"
 
-#define N_NUM_THREADS 2
+#define N_NUM_THREADS 3
 #define M_NUM_REQS 2
 
 #define MUTEX_1 "/mutex_1"
@@ -78,26 +79,11 @@ typedef struct thread_params {
     Queue *response_2;
 } thread_params;
 
-
-typedef struct r_req {
-    void *address;
-    int size;
-} r_req;
-
-typedef struct w_req {
-    void *address;
-    int size;
-} w_req;
-
 void *create_send_request(void *);
 
 void *receive_send_response(void *);
 
 void *forward_request_response(void *);
-
-int print(char *);
-
-int print_int(int);
 
 int share(int *share, char *path, int size);
 
@@ -125,28 +111,20 @@ int main(int argc, char **argv) {
 
     share(&shr_req_q_1, REQ_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
     req_q_1 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_req_q_1, 0);
-    req_q_1->capacity = M_NUM_REQS * N_NUM_THREADS;
-    req_q_1->front = req_q_1->size = 0;
-    req_q_1->rear = req_q_1->capacity - 1;
+    init(req_q_1);
 
 
     share(&shr_resp_q_1, RESP_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
     resp_q_1 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_resp_q_1, 0);
-    resp_q_1->capacity = M_NUM_REQS * N_NUM_THREADS;
-    resp_q_1->front = resp_q_1->size = 0;
-    resp_q_1->rear = resp_q_1->capacity - 1;
+    init(resp_q_1);
 
     share(&shr_req_q_2, REQ_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
     req_q_2 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_req_q_2, 0);
-    req_q_2->capacity = M_NUM_REQS * N_NUM_THREADS;
-    req_q_2->front = req_q_2->size = 0;
-    req_q_2->rear = req_q_2->capacity - 1;
+    init(req_q_2);
 
     share(&shr_resp_q_2, RESP_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
     resp_q_2 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_resp_q_2, 0);
-    resp_q_2->capacity = M_NUM_REQS * N_NUM_THREADS;
-    resp_q_2->front = resp_q_2->size = 0;
-    resp_q_2->rear = resp_q_2->capacity - 1;
+    init(resp_q_2);
 
 
     thread_params *params_1 = malloc(sizeof(thread_params));   /* Create thread parameters */
@@ -211,6 +189,9 @@ void *create_send_request(void *ptr) {
     // init
     int id = gettid();
     int i;
+    request *req = malloc(sizeof(request));
+    req->size = id;
+
     thread_params *params = (thread_params *) ptr;
     Queue *request = params->request_1;
     Queue *response = params->response_1;
@@ -218,9 +199,9 @@ void *create_send_request(void *ptr) {
     // sending request
     pthread_mutex_lock(mutex_1);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(request, id);
+        enqueue(request, req);
         print("\nSent request: ");
-        print_int(id);
+        print_int(req->size);
     }
     pthread_cond_signal(cond_1);
     pthread_mutex_unlock(mutex_1);
@@ -231,15 +212,17 @@ void *create_send_request(void *ptr) {
         pthread_cond_wait(cond_4, mutex_4);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        int o_id = dequeue(response);
+        dequeue(response, req);
         print("\nReceived response: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_mutex_unlock(mutex_4);
 }
 
 void *forward_request_response(void *ptr) {
     int i, o_id;
+    request *req = malloc(sizeof(request));
+
     thread_params *params = (thread_params *) ptr;
     Queue *request_1 = params->request_1;
     Queue *response_1 = params->response_1;
@@ -252,18 +235,18 @@ void *forward_request_response(void *ptr) {
         pthread_cond_wait(cond_1, mutex_1);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        o_id = dequeue(request_1);
+        dequeue(request_1, req);
         print("\nReceived request: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_mutex_unlock(mutex_1);
 
     // forwarding request
     pthread_mutex_lock(mutex_2);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(request_2, o_id);
+        enqueue(request_2, req);
         print("\nForwarded request: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_cond_signal(cond_2);
     pthread_mutex_unlock(mutex_2);
@@ -274,18 +257,18 @@ void *forward_request_response(void *ptr) {
         pthread_cond_wait(cond_3, mutex_3);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        o_id = dequeue(response_2);
+        dequeue(response_2, req);
         print("\nReceived response: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_mutex_unlock(mutex_3);
 
     // forwarding response
     pthread_mutex_lock(mutex_4);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(response_1, o_id);
+        enqueue(response_1, req);
         print("\nForwarded response: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_cond_signal(cond_4);
     pthread_mutex_unlock(mutex_4);
@@ -296,6 +279,8 @@ void *receive_send_response(void *ptr) {
     // init
     int id = gettid();
     int i, o_id;
+    request *req = malloc(sizeof(request));
+
     thread_params *params = (thread_params *) ptr;
     Queue *request = params->request_1;
     Queue *response = params->response_1;
@@ -306,32 +291,23 @@ void *receive_send_response(void *ptr) {
         pthread_cond_wait(cond_2, mutex_2);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        o_id = dequeue(request);
+        dequeue(request, req);
         print("\nReceived request: ");
-        print_int(o_id);
+        print_int(req->size);
     }
     pthread_mutex_unlock(mutex_2);
 
 
+    req->size = id;
     // sending response
     pthread_mutex_lock(mutex_3);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(response, id);
+        enqueue(response, req);
         print("\nSent response: ");
-        print_int(id);
+        print_int(req->size);
     }
     pthread_cond_signal(cond_3);
     pthread_mutex_unlock(mutex_3);
-}
-
-int print(char *str) {
-    write(1, str, strlen(str));
-}
-
-int print_int(int num) {
-    char number[20];
-    sprintf(number, "%d", num);
-    print(number);
 }
 
 int share(int *share, char *path, int size) {
