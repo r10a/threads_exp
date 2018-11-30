@@ -25,8 +25,8 @@
 //#include "ArrayQueue.h"
 #include "CircularQueue.h"
 
-#define N_NUM_THREADS 3
-#define M_NUM_REQS 2
+#define N_NUM_THREADS 1
+#define M_NUM_REQS 1
 
 #define MUTEX_1 "/mutex_1"
 #define MUTEX_2 "/mutex_2"
@@ -85,7 +85,7 @@ void *receive_send_response(void *);
 
 void *forward_request_response(void *);
 
-int share(int *share, char *path, int size);
+int share(int *share, char *path, size_t size);
 
 void init_mutex_cond();
 
@@ -126,7 +126,6 @@ int main(int argc, char **argv) {
     resp_q_2 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_resp_q_2, 0);
     init(resp_q_2);
 
-
     thread_params *params_1 = malloc(sizeof(thread_params));   /* Create thread parameters */
     params_1->request_1 = req_q_1;
     params_1->response_1 = resp_q_1;
@@ -141,7 +140,8 @@ int main(int argc, char **argv) {
     params_3->request_1 = req_q_2;
     params_3->response_1 = resp_q_2;
 
-    if ((pid_1 = fork()) == 0) { /* Child Process 1*/
+
+    if ((pid_1 = fork()) == 0) {  /*Child Process 1*/
 
         pthread_t threads[N_NUM_THREADS];
         print("\nprocess 1 created");
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
             pthread_join(threads[i], NULL);
         }
         exit(0);
-    } else if ((pid_2 = fork()) == 0) {  /* Child Process 2 */
+    } else if ((pid_2 = fork()) == 0) {   /*Child Process 2*/
         pthread_t threads[N_NUM_THREADS];
         print("\nprocess 2 created");
 
@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
             pthread_join(threads[i], NULL);
         }
         exit(0);
-    } else if ((pid_3 = fork()) == 0) {  /* Child Process 3 */
+    } else if ((pid_3 = fork()) == 0) {   /*Child Process 3*/
         pthread_t threads[N_NUM_THREADS];
         print("\nprocess 3 created");
 
@@ -187,10 +187,10 @@ int main(int argc, char **argv) {
 void *create_send_request(void *ptr) {
 
     // init
-    int id = gettid();
+    request *req;
+    request *resp = malloc(sizeof(request));
+    char str[10];
     int i;
-    request *req = malloc(sizeof(request));
-    req->size = id;
 
     thread_params *params = (thread_params *) ptr;
     Queue *request = params->request_1;
@@ -199,9 +199,16 @@ void *create_send_request(void *ptr) {
     // sending request
     pthread_mutex_lock(mutex_1);
     for (i = 0; i < M_NUM_REQS; i++) {
+        req = malloc(sizeof(request));
+        req->size = rand_size();
+        rand_str(str, sizeof(str));
+        share(&req->shmid, str, req->size/2);
+//        fill_request(req->shmid, req->size/2);
+//        print_request(req->shmid, req->size/2);
         enqueue(request, req);
         print("\nSent request: ");
-        print_int(req->size);
+        print_int(req->shmid);
+//        shm_unlink(str);
     }
     pthread_cond_signal(cond_1);
     pthread_mutex_unlock(mutex_1);
@@ -212,16 +219,18 @@ void *create_send_request(void *ptr) {
         pthread_cond_wait(cond_4, mutex_4);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        dequeue(response, req);
+        dequeue(response, resp);
         print("\nReceived response: ");
-        print_int(req->size);
+        print_request(resp->shmid, resp->size/2);
+        print_int(resp->shmid);
     }
     pthread_mutex_unlock(mutex_4);
+    return 0;
 }
 
 void *forward_request_response(void *ptr) {
-    int i, o_id;
-    request *req = malloc(sizeof(request));
+    int i;
+    request *req[M_NUM_REQS];
 
     thread_params *params = (thread_params *) ptr;
     Queue *request_1 = params->request_1;
@@ -235,18 +244,19 @@ void *forward_request_response(void *ptr) {
         pthread_cond_wait(cond_1, mutex_1);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        dequeue(request_1, req);
+        req[i] = malloc(sizeof(request));
+        dequeue(request_1, req[i]);
         print("\nReceived request: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
     }
     pthread_mutex_unlock(mutex_1);
 
     // forwarding request
     pthread_mutex_lock(mutex_2);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(request_2, req);
+        enqueue(request_2, req[i]);
         print("\nForwarded request: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
     }
     pthread_cond_signal(cond_2);
     pthread_mutex_unlock(mutex_2);
@@ -257,29 +267,30 @@ void *forward_request_response(void *ptr) {
         pthread_cond_wait(cond_3, mutex_3);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        dequeue(response_2, req);
+        dequeue(response_2, req[i]);
         print("\nReceived response: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
     }
     pthread_mutex_unlock(mutex_3);
 
     // forwarding response
     pthread_mutex_lock(mutex_4);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(response_1, req);
+        enqueue(response_1, req[i]);
         print("\nForwarded response: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
+        free(req[i]);
     }
     pthread_cond_signal(cond_4);
     pthread_mutex_unlock(mutex_4);
+    return 0;
 }
 
 void *receive_send_response(void *ptr) {
 
     // init
-    int id = gettid();
-    int i, o_id;
-    request *req = malloc(sizeof(request));
+    int i;
+    request *req[M_NUM_REQS];
 
     thread_params *params = (thread_params *) ptr;
     Queue *request = params->request_1;
@@ -291,26 +302,28 @@ void *receive_send_response(void *ptr) {
         pthread_cond_wait(cond_2, mutex_2);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        dequeue(request, req);
+        req[i] = malloc(sizeof(request));
+        dequeue(request, req[i]);
         print("\nReceived request: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
     }
     pthread_mutex_unlock(mutex_2);
 
-
-    req->size = id;
     // sending response
     pthread_mutex_lock(mutex_3);
     for (i = 0; i < M_NUM_REQS; i++) {
-        enqueue(response, req);
+        fill_request(req[i]->shmid, (req[i]->size)/2);
+        enqueue(response, req[i]);
         print("\nSent response: ");
-        print_int(req->size);
+        print_int(req[i]->shmid);
+        free(req[i]);
     }
     pthread_cond_signal(cond_3);
     pthread_mutex_unlock(mutex_3);
+    return 0;
 }
 
-int share(int *share, char *path, int size) {
+int share(int *share, char *path, size_t size) {
     *share = shm_open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
 
     if (*share < 0) {
@@ -344,18 +357,6 @@ void init_mutex_cond() {
 
 
 void cleanup() {
-    shm_unlink(MUTEX_1);
-    shm_unlink(REQ_QUEUE_1);
-    shm_unlink(CONDITION_1);
-    shm_unlink(MUTEX_2);
-    shm_unlink(RESP_QUEUE_1);
-    shm_unlink(CONDITION_2);
-    shm_unlink(MUTEX_3);
-    shm_unlink(REQ_QUEUE_2);
-    shm_unlink(CONDITION_3);
-    shm_unlink(MUTEX_4);
-    shm_unlink(RESP_QUEUE_2);
-    shm_unlink(CONDITION_4);
     pthread_mutex_destroy(mutex_1);    /* Free up the_mutex */
     pthread_mutex_destroy(mutex_2);    /* Free up the_mutex */
     pthread_mutex_destroy(mutex_3);    /* Free up the_mutex */
@@ -364,4 +365,28 @@ void cleanup() {
     pthread_cond_destroy(cond_2);        /* Free up consumer condition variable */
     pthread_cond_destroy(cond_3);        /* Free up consumer condition variable */
     pthread_cond_destroy(cond_4);        /* Free up consumer condition variable */
+    shm_unlink(MUTEX_1);
+    shm_unlink(REQ_QUEUE_1);
+    shm_unlink(CONDITION_1);
+    munmap(mutex_1, sizeof(pthread_mutex_t));
+    munmap(req_q_1, sizeof(Queue));
+    munmap(cond_1, sizeof(pthread_cond_t));
+    shm_unlink(MUTEX_2);
+    shm_unlink(RESP_QUEUE_1);
+    shm_unlink(CONDITION_2);
+    munmap(mutex_2, sizeof(pthread_mutex_t));
+    munmap(resp_q_1, sizeof(Queue));
+    munmap(cond_2, sizeof(pthread_cond_t));
+    shm_unlink(MUTEX_3);
+    shm_unlink(REQ_QUEUE_2);
+    shm_unlink(CONDITION_3);
+    munmap(mutex_3, sizeof(pthread_mutex_t));
+    munmap(req_q_2, sizeof(Queue));
+    munmap(cond_3, sizeof(pthread_cond_t));
+    shm_unlink(MUTEX_4);
+    shm_unlink(RESP_QUEUE_2);
+    shm_unlink(CONDITION_4);
+    munmap(mutex_4, sizeof(pthread_mutex_t));
+    munmap(resp_q_2, sizeof(Queue));
+    munmap(cond_4, sizeof(pthread_cond_t));
 }
