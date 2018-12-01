@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <asm/errno.h>
 #include <sys/syscall.h>
+#include <fcntl.h>
 
 #define gettid() syscall(SYS_gettid)
 
@@ -219,7 +220,7 @@ void *create_send_request(void *ptr) {
     for (i = 0; i < M_NUM_REQS; i++) {
         dequeue(response, req);
         print("\nReceived response: ");
-        print_request(req->shmnm, req->size/2);
+        print_request(req->shmnm, (req->size)/2);
 //        print(req->shmnm);
         shm_unlink(req->shmnm);
     }

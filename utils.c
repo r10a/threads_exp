@@ -24,7 +24,7 @@ int print_int(int num) {
 
 void fill_request(char shmnm[], size_t size) {
     int *shmid;
-    void* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, create_shm(shmid, shmnm, size), 0);
+    char* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, create_shm(shmid, shmnm, size), 0);
     if(request == MAP_FAILED) {
         print("failure on mmap");
         print_int(errno);
@@ -36,7 +36,7 @@ void fill_request(char shmnm[], size_t size) {
 
 void print_request(char shmnm[], size_t size) {
     int *shmid;
-    char* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, open_shm(shmid, shmnm, size), 0);
+    char* request = mmap(NULL, size, PROT_READ, MAP_SHARED, open_shm(shmid, shmnm, size), 0);
     if(request == MAP_FAILED) {
         print("failure on mmap: ");
         print_int(errno);
@@ -68,6 +68,7 @@ int create_shm(int *share, char *path, size_t size) {
 
     if (*share < 0) {
         print("failure on shm_open");
+        print_int(errno);
         exit(1);
     }
     if (ftruncate(*share, size) == -1) {
@@ -78,7 +79,7 @@ int create_shm(int *share, char *path, size_t size) {
 }
 
 int open_shm(int *share, char *path, size_t size) {
-    *share = shm_open(path, O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
+    *share = shm_open(path, O_RDWR, S_IRWXU | S_IRWXG);
 
     if (*share < 0) {
         print("failure on shm_open");
