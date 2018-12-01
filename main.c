@@ -25,8 +25,8 @@
 //#include "ArrayQueue.h"
 #include "CircularQueue.h"
 
-#define N_NUM_THREADS 1
-#define M_NUM_REQS 1
+#define N_NUM_THREADS 2
+#define M_NUM_REQS 2
 
 #define MUTEX_1 "/mutex_1"
 #define MUTEX_2 "/mutex_2"
@@ -205,6 +205,7 @@ void *create_send_request(void *ptr) {
     for (i = 0; i < M_NUM_REQS; i++) {
         req->size = rand_size();
         rand_str(req->shmnm, sizeof(req->shmnm));
+        fill_request(req->shmnm, (req->size)/2);
         enqueue(request, req);
         print("\nSent request: ");
         print(req->shmnm);
@@ -313,7 +314,7 @@ void *receive_send_response(void *ptr) {
     // sending response
     pthread_mutex_lock(mutex_3);
     for (i = 0; i < M_NUM_REQS; i++) {
-        fill_request(req[i]->shmnm, (req[i]->size)/2);
+//        fill_request(req[i]->shmnm, (req[i]->size)/2);
         enqueue(response, req[i]);
         print("\nSent response: ");
         print(req[i]->shmnm);
