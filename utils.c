@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include "utils.h"
 #include <errno.h>
+#include <fcntl.h>
 
 int print(char *str) {
     write(1, str, strlen(str));
@@ -21,43 +22,28 @@ int print_int(int num) {
     print(number);
 }
 
-void fill_request(int shmid, size_t size) {
-    void* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, shmid, 0);
+void fill_request(char shmnm[], size_t size) {
+    int *shmid;
+    void* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, create_shm(shmid, shmnm, size), 0);
     if(request == MAP_FAILED) {
-        print("\nFailed: ");
+        print("failure on mmap");
         print_int(errno);
         return;
     }
-//    char c;
-//    char str[size];
-//    rand_str(&c, sizeof(char));
-//    memset(str, c, size);
-//    memcpy(request, str, size);
-//    msync(request, size, MS_SYNC);
+    memset(request, 'r', size);
     munmap(request, size);
 }
 
-void print_request(int shmid, size_t size) {
-    char* request = mmap(NULL, size, PROT_READ, MAP_SHARED, shmid, 0);
+void print_request(char shmnm[], size_t size) {
+    int *shmid;
+    char* request = mmap(NULL, size, PROT_WRITE, MAP_SHARED, open_shm(shmid, shmnm, size), 0);
     if(request == MAP_FAILED) {
-        print("Failed");
+        print("failure on mmap: ");
+        print_int(errno);
         return;
     }
-    mlock(request, size);
     print(request);
-    munlock(request, size);
-//    munmap(request, size);
-}
-
-void clear_request(int shmid, size_t size) {
-    void* request = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, shmid, 0);
-    print("here");
-    print("\nshmid: ");
-    print_int(shmid);
-    print("\nsize: ");
-    print_int(size);
-    memset(request, 'w', size);
-//    munmap(request, size);
+    munmap(request, size);
 }
 
 // Added from https://stackoverflow.com/a/15768317/10660687
@@ -76,6 +62,36 @@ void rand_str(char *dest, size_t length) {
 size_t rand_size() {
     return (size_t) rand() % 40;
 }
+
+int create_shm(int *share, char *path, size_t size) {
+    *share = shm_open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
+
+    if (*share < 0) {
+        print("failure on shm_open");
+        exit(1);
+    }
+    if (ftruncate(*share, size) == -1) {
+        print("Error on ftruncate\n");
+        exit(-1);
+    }
+    return *share;
+}
+
+int open_shm(int *share, char *path, size_t size) {
+    *share = shm_open(path, O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
+
+    if (*share < 0) {
+        print("failure on shm_open");
+        exit(1);
+    }
+    if (ftruncate(*share, size) == -1) {
+        print("Error on ftruncate\n");
+        exit(-1);
+    }
+    return *share;
+}
+
+
 
 // Added from http://home.thep.lu.se/~bjorn/crc/
 uint32_t crc32_for_byte(uint32_t r) {

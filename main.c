@@ -15,7 +15,6 @@
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <asm/errno.h>
 #include <sys/syscall.h>
 
@@ -85,8 +84,6 @@ void *receive_send_response(void *);
 
 void *forward_request_response(void *);
 
-int share(int *share, char *path, size_t size);
-
 void init_mutex_cond();
 
 void cleanup();
@@ -95,34 +92,42 @@ int main(int argc, char **argv) {
     int pid_1, pid_2, pid_3, i;
 
     /* Map Mutex to shared memory */ /* Map Condition to shared memory */
-    mutex_1 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_1, MUTEX_1, sizeof(pthread_mutex_t)), 0);
-    cond_1 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_1, CONDITION_1, sizeof(pthread_cond_t)), 0);
+    mutex_1 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                       create_shm(&shr_mutex_1, MUTEX_1, sizeof(pthread_mutex_t)), 0);
+    cond_1 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                     create_shm(&shr_cond_1, CONDITION_1, sizeof(pthread_cond_t)), 0);
 
-    mutex_2 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_2, MUTEX_2, sizeof(pthread_mutex_t)), 0);
-    cond_2 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_2, CONDITION_2, sizeof(pthread_cond_t)), 0);
+    mutex_2 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                       create_shm(&shr_mutex_2, MUTEX_2, sizeof(pthread_mutex_t)), 0);
+    cond_2 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                     create_shm(&shr_cond_2, CONDITION_2, sizeof(pthread_cond_t)), 0);
 
-    mutex_3 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_3, MUTEX_3, sizeof(pthread_mutex_t)), 0);
-    cond_3 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_3, CONDITION_3, sizeof(pthread_cond_t)), 0);
+    mutex_3 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                       create_shm(&shr_mutex_3, MUTEX_3, sizeof(pthread_mutex_t)), 0);
+    cond_3 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                     create_shm(&shr_cond_3, CONDITION_3, sizeof(pthread_cond_t)), 0);
 
-    mutex_4 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_mutex_4, MUTEX_4, sizeof(pthread_mutex_t)), 0);
-    cond_4 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED, share(&shr_cond_4, CONDITION_4, sizeof(pthread_cond_t)), 0);
+    mutex_4 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                       create_shm(&shr_mutex_4, MUTEX_4, sizeof(pthread_mutex_t)), 0);
+    cond_4 = (pthread_cond_t *) mmap(NULL, sizeof(pthread_cond_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                     create_shm(&shr_cond_4, CONDITION_4, sizeof(pthread_cond_t)), 0);
 
     init_mutex_cond();
 
-    share(&shr_req_q_1, REQ_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
+    create_shm(&shr_req_q_1, REQ_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
     req_q_1 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_req_q_1, 0);
     init(req_q_1);
 
 
-    share(&shr_resp_q_1, RESP_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
+    create_shm(&shr_resp_q_1, RESP_QUEUE_1, sizeof(Queue));    /* Map queue to shared memory */
     resp_q_1 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_resp_q_1, 0);
     init(resp_q_1);
 
-    share(&shr_req_q_2, REQ_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
+    create_shm(&shr_req_q_2, REQ_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
     req_q_2 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_req_q_2, 0);
     init(req_q_2);
 
-    share(&shr_resp_q_2, RESP_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
+    create_shm(&shr_resp_q_2, RESP_QUEUE_2, sizeof(Queue));    /* Map queue to shared memory */
     resp_q_2 = (Queue *) mmap(NULL, sizeof(Queue), PROT_READ | PROT_WRITE, MAP_SHARED, shr_resp_q_2, 0);
     init(resp_q_2);
 
@@ -187,9 +192,7 @@ int main(int argc, char **argv) {
 void *create_send_request(void *ptr) {
 
     // init
-    request *req;
-    request *resp = malloc(sizeof(request));
-    char str[10];
+    request *req = malloc(sizeof(request));
     int i;
 
     thread_params *params = (thread_params *) ptr;
@@ -199,16 +202,11 @@ void *create_send_request(void *ptr) {
     // sending request
     pthread_mutex_lock(mutex_1);
     for (i = 0; i < M_NUM_REQS; i++) {
-        req = malloc(sizeof(request));
         req->size = rand_size();
-        rand_str(str, sizeof(str));
-        share(&req->shmid, str, req->size/2);
-//        fill_request(req->shmid, req->size/2);
-//        print_request(req->shmid, req->size/2);
+        rand_str(req->shmnm, sizeof(req->shmnm));
         enqueue(request, req);
         print("\nSent request: ");
-        print_int(req->shmid);
-//        shm_unlink(str);
+        print(req->shmnm);
     }
     pthread_cond_signal(cond_1);
     pthread_mutex_unlock(mutex_1);
@@ -219,11 +217,13 @@ void *create_send_request(void *ptr) {
         pthread_cond_wait(cond_4, mutex_4);
     }
     for (i = 0; i < M_NUM_REQS; i++) {
-        dequeue(response, resp);
+        dequeue(response, req);
         print("\nReceived response: ");
-        print_request(resp->shmid, resp->size/2);
-        print_int(resp->shmid);
+        print_request(req->shmnm, req->size/2);
+//        print(req->shmnm);
+        shm_unlink(req->shmnm);
     }
+    free(req);
     pthread_mutex_unlock(mutex_4);
     return 0;
 }
@@ -247,7 +247,7 @@ void *forward_request_response(void *ptr) {
         req[i] = malloc(sizeof(request));
         dequeue(request_1, req[i]);
         print("\nReceived request: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
     }
     pthread_mutex_unlock(mutex_1);
 
@@ -256,7 +256,7 @@ void *forward_request_response(void *ptr) {
     for (i = 0; i < M_NUM_REQS; i++) {
         enqueue(request_2, req[i]);
         print("\nForwarded request: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
     }
     pthread_cond_signal(cond_2);
     pthread_mutex_unlock(mutex_2);
@@ -269,7 +269,7 @@ void *forward_request_response(void *ptr) {
     for (i = 0; i < M_NUM_REQS; i++) {
         dequeue(response_2, req[i]);
         print("\nReceived response: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
     }
     pthread_mutex_unlock(mutex_3);
 
@@ -278,7 +278,7 @@ void *forward_request_response(void *ptr) {
     for (i = 0; i < M_NUM_REQS; i++) {
         enqueue(response_1, req[i]);
         print("\nForwarded response: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
         free(req[i]);
     }
     pthread_cond_signal(cond_4);
@@ -305,36 +305,22 @@ void *receive_send_response(void *ptr) {
         req[i] = malloc(sizeof(request));
         dequeue(request, req[i]);
         print("\nReceived request: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
     }
     pthread_mutex_unlock(mutex_2);
 
     // sending response
     pthread_mutex_lock(mutex_3);
     for (i = 0; i < M_NUM_REQS; i++) {
-        fill_request(req[i]->shmid, (req[i]->size)/2);
+        fill_request(req[i]->shmnm, (req[i]->size)/2);
         enqueue(response, req[i]);
         print("\nSent response: ");
-        print_int(req[i]->shmid);
+        print(req[i]->shmnm);
         free(req[i]);
     }
     pthread_cond_signal(cond_3);
     pthread_mutex_unlock(mutex_3);
     return 0;
-}
-
-int share(int *share, char *path, size_t size) {
-    *share = shm_open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU | S_IRWXG);
-
-    if (*share < 0) {
-        perror("failure on shm_open");
-        exit(1);
-    }
-    if (ftruncate(*share, size) == -1) {
-        perror("Error on ftruncate\n");
-        exit(-1);
-    }
-    return *share;
 }
 
 void init_mutex_cond() {

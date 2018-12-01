@@ -13,13 +13,15 @@ int print(char *);
 
 int print_int(int);
 
-void fill_request(int, size_t);
+void fill_request(char [], size_t);
 
-void print_request(int, size_t);
-
-void clear_request(int, size_t);
+void print_request(char [], size_t);
 
 size_t rand_size();
+
+int create_shm(int *share, char *path, size_t size);
+
+int open_shm(int *share, char *path, size_t size);
 
 void rand_str(char *dest, size_t length);
 
@@ -29,6 +31,6 @@ void crc32(const void *data, size_t n_bytes, uint32_t* crc);
 
 // TODO: Allow variable size requests
 typedef struct request {
-    int shmid;
     size_t size;
+    char shmnm[10];
 } request;
