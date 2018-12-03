@@ -8,7 +8,10 @@ find_package( Threads REQUIRED )
 
 #add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
 
-add_executable(threads_exp main.c CircularQueue.c CircularQueue.h utils.c utils.h)
+#add_executable(threads_exp main.c CircularQueue.c CircularQueue.h utils.c utils.h)
+#add_executable(threads_exp utils.c utils.h benchmarks/posix_mutex.c benchmarks/posix_mutex.h)
+#add_executable(threads_exp utils.c utils.h benchmarks/pipe.c benchmarks/pipe.h)
+add_executable(threads_exp utils.c utils.h benchmarks/futex.c benchmarks/futex.h)
 
 target_link_libraries(threads_exp Threads::Threads)
 

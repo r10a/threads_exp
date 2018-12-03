@@ -18,6 +18,7 @@
 #include <asm/errno.h>
 #include <sys/syscall.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #define gettid() syscall(SYS_gettid)
 
@@ -25,8 +26,11 @@
 //#include "ArrayQueue.h"
 #include "CircularQueue.h"
 
-#define N_NUM_THREADS 2
-#define M_NUM_REQS 2
+#define N_NUM_THREADS 1
+#define M_NUM_REQS 1
+
+#define TV_1 "/TIME1"
+#define TV_2 "/TIME2"
 
 #define MUTEX_1 "/mutex_1"
 #define MUTEX_2 "/mutex_2"
@@ -43,6 +47,8 @@
 
 #define REQ_QUEUE_2 "/req_q_2"
 #define RESP_QUEUE_2 "/resp_q_2"
+
+struct timeval  *tv1, *tv2;
 
 pthread_mutexattr_t mattr;
 pthread_condattr_t cattr;
@@ -91,6 +97,12 @@ void cleanup();
 
 int main(int argc, char **argv) {
     int pid_1, pid_2, pid_3, i;
+    int t1, t2;
+
+    tv1 = (struct timeval *) mmap(NULL, sizeof(struct timeval), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                create_shm(&t1, TV_1, sizeof(struct timeval)), 0);
+    tv2 = (struct timeval *) mmap(NULL, sizeof(struct timeval), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                  create_shm(&t2, TV_2, sizeof(struct timeval)), 0);
 
     /* Map Mutex to shared memory */ /* Map Condition to shared memory */
     mutex_1 = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
@@ -345,6 +357,11 @@ void init_mutex_cond() {
 
 
 void cleanup() {
+
+    shm_unlink(TV_1);
+    munmap(tv1, sizeof(struct timeval));
+    shm_unlink(TV_1);
+    munmap(tv2, sizeof(struct timeval));
     pthread_mutex_destroy(mutex_1);    /* Free up the_mutex */
     pthread_mutex_destroy(mutex_2);    /* Free up the_mutex */
     pthread_mutex_destroy(mutex_3);    /* Free up the_mutex */

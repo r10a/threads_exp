@@ -3,6 +3,7 @@
 //
 
 #include <stdint.h>
+#include <sched.h>
 
 #ifndef THREADS_EXP_UTILS_H
 #define THREADS_EXP_UTILS_H
@@ -13,6 +14,8 @@ int print(char *);
 
 int print_int(int);
 
+int print_double(double num);
+
 void fill_request(char [], size_t);
 
 void print_request(char [], size_t);
@@ -22,6 +25,10 @@ size_t rand_size();
 int create_shm(int *share, char *path, size_t size);
 
 int open_shm(int *share, char *path, size_t size);
+
+int assign_thread_to_core(int core_id, pthread_t pthread);
+
+int get_core_number(pthread_t thread);
 
 void rand_str(char *dest, size_t length);
 
