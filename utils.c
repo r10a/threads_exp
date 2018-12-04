@@ -12,7 +12,6 @@
 #include "utils.h"
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/time.h>
 #include <pthread.h>
 
 int print(char *str) {
@@ -100,6 +99,17 @@ int open_shm(int *share, char *path, size_t size) {
         exit(-1);
     }
     return *share;
+}
+
+int assign_curr_process_to_core(int core_id) {
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    if (core_id < 0 || core_id >= num_cores)
+        return EINVAL;
+
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+    return sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
 }
 
 int assign_thread_to_core(int core_id, pthread_t pthread) {

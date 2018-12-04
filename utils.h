@@ -26,6 +26,8 @@ int create_shm(int *share, char *path, size_t size);
 
 int open_shm(int *share, char *path, size_t size);
 
+int assign_curr_process_to_core(int core_id);
+
 int assign_thread_to_core(int core_id, pthread_t pthread);
 
 int get_core_number(pthread_t thread);
