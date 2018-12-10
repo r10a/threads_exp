@@ -1,14 +1,17 @@
+#define _POSIX_C_SOURCE 199309L
+#define _GNU_SOURCE
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <linux/futex.h>
 #include <sys/mman.h>
 #include <pthread.h>
+#include <bits/time.h>
+#include <time.h>
 #include "../utils.h"
 
 static inline long long unsigned time_ns(struct timespec *const ts) {
@@ -34,7 +37,7 @@ static inline void start_timer() {
 
 static inline void stop_timer() {
     *delta_sh = time_ns(&ts) - *start_sh;
-    printf("Time taken: %llu us\n", *delta_sh / 1000);
+    printf("%llu\n", *delta_sh / 1000);
 }
 
 int main(void) {

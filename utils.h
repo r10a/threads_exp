@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <sched.h>
+#include <pthread.h>
 
 #ifndef THREADS_EXP_UTILS_H
 #define THREADS_EXP_UTILS_H
