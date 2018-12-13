@@ -1,6 +1,7 @@
 //
 // Created by rohit on 12/2/2018.
 //
+#define _POSIX_C_SOURCE 199309L
 
 #include <stdio.h>
 #include <sys/mman.h>
@@ -23,14 +24,29 @@
 #define MUTEX_1 "/mutex"
 #define CONDITION_1 "/cond"
 
-struct timeval *tv1, *tv2, *tv3;
+static inline long long unsigned time_ns(struct timespec *const ts) {
+    if (clock_gettime(CLOCK_REALTIME, ts)) {
+        exit(1);
+    }
+    return ((long long unsigned) ts->tv_sec) * 1000000000LLU
+           + (long long unsigned) ts->tv_nsec;
+}
+
+struct timespec ts;
+long long unsigned *start_sh, *delta_sh;
 char *mem;
 pthread_mutex_t *mutex_1;
 pthread_cond_t *cond_1;
 
-void start_timer();
+static inline void start_timer() {
+    *start_sh = time_ns(&ts);
+}
 
-void stop_timer();
+static inline void stop_timer() {
+    *delta_sh = time_ns(&ts) - *start_sh;
+    printf("%llu\n", *delta_sh / 1000);
+}
+
 
 void *send_message();
 
@@ -38,16 +54,14 @@ void *recv_message();
 
 int main(int argc, char **argv) {
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 1000; i++) {
 
-        int t1, t2, t3, m, mutex, cond;
+        int ts1, ts2, m, mutex, cond;
         int pid_1, pid_2;
-        tv1 = (struct timeval *) mmap(NULL, sizeof(struct timeval), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                      create_shm(&t1, TV_1, sizeof(struct timeval)), 0);
-        tv2 = (struct timeval *) mmap(NULL, sizeof(struct timeval), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                      create_shm(&t2, TV_2, sizeof(struct timeval)), 0);
-        tv3 = (struct timeval *) mmap(NULL, sizeof(struct timeval), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                      create_shm(&t3, TV_3, sizeof(struct timeval)), 0);
+        start_sh = (long long unsigned *) mmap(NULL, sizeof(long long unsigned), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                               create_shm(&ts1, "/time1", sizeof(long long unsigned)), 0);
+        delta_sh = (long long unsigned *) mmap(NULL, sizeof(long long unsigned), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                               create_shm(&ts2, "/time2", sizeof(long long unsigned)), 0);
         mem = (char *) mmap(NULL, sizeof(char), PROT_READ | PROT_WRITE, MAP_SHARED,
                             create_shm(&m, SHM, sizeof(char)), 0);
 
@@ -60,6 +74,7 @@ int main(int argc, char **argv) {
         pthread_condattr_t cattr;
 
         pthread_mutexattr_init(&mattr);
+        pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_ADAPTIVE_NP);
         pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
         pthread_mutex_init(mutex_1, &mattr);    /* Initialize mutex variable */
 
@@ -83,15 +98,11 @@ int main(int argc, char **argv) {
         }
         int pid, status;
         while ((pid = wait(&status)) > 0);
-        printf("%f\n", (double)((tv3->tv_usec - tv2->tv_usec) - (tv2->tv_usec - tv1->tv_usec)));
 
-
-        munmap(tv1, sizeof(struct timeval));
-        munmap(tv2, sizeof(struct timeval));
-        munmap(tv3, sizeof(struct timeval));
-        shm_unlink(TV_1);
-        shm_unlink(TV_2);
-        shm_unlink(TV_3);
+        munmap(start_sh, sizeof(long long unsigned));
+        munmap(delta_sh, sizeof(long long unsigned));
+        shm_unlink("/time1");
+        shm_unlink("/time2");
 
         munmap(mem, sizeof(char));
         shm_unlink(SHM);
@@ -107,19 +118,10 @@ int main(int argc, char **argv) {
     }
 }
 
-void start_timer() {
-    gettimeofday(tv1, NULL);
-    gettimeofday(tv2, NULL);
-}
-
-void stop_timer() {
-    gettimeofday(tv3, NULL);
-}
-
 void *send_message() {
     pthread_mutex_lock(mutex_1);
-    start_timer();
     memset(mem, 'r', sizeof(char));
+    start_timer();
     pthread_cond_signal(cond_1);
     pthread_mutex_unlock(mutex_1);
 }
@@ -130,5 +132,6 @@ void *recv_message() {
         pthread_cond_wait(cond_1, mutex_1);
 //        printf(mem);
     stop_timer();
+    memset(mem, 'w', sizeof(char));
     pthread_mutex_unlock(mutex_1);
 }
