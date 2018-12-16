@@ -18,13 +18,13 @@ void init(int nprocs, int logn) {
   if (logn == 0) logn = LOGN_OPS;
 
   /** Compute the number of ops to perform. */
-  nops = 1;
+ /* nops = 1;
   int i;
   for (i = 0; i < logn; ++i) {
     nops *= 10;
   }
 
-  printf("  Number of operations: %ld\n", nops);
+  printf("  Number of operations: %ld\n", nops);*/
 
   q = align_malloc(PAGE_SIZE, sizeof(queue_t));
   queue_init(q, nprocs);

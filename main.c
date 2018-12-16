@@ -8,6 +8,7 @@
 #include <math.h>
 #include "bits.h"
 #include "cpumap.h"
+#include "shm_malloc.h"
 
 #ifndef NUM_ITERS
 #define NUM_ITERS 5
@@ -15,6 +16,10 @@
 
 #ifndef MAX_ITERS
 #define MAX_ITERS 20
+#endif
+
+#ifndef SHM_FILE
+#define SHM_FILE "tshm1_file"
 #endif
 
 static pthread_barrier_t barrier;
@@ -52,10 +57,10 @@ static void *send(void *bits) {
 
     thread_init(id, nprocs);
     pthread_barrier_wait(&barrier);
-    int item = 1;
+    int item = 10;
     printf("\n Enqueued: %d", item);
     wfenqueue(id, item);
-
+    pthread_barrier_wait(&barrier);
     thread_exit(id, nprocs);
     return 0;
 }
@@ -71,8 +76,10 @@ static void *recv(void *bits) {
     sched_setaffinity(0, sizeof(set), &set);
 
     thread_init(id, nprocs);
+
     pthread_barrier_wait(&barrier);
 //    wfenqueue(id);
+    pthread_barrier_wait(&barrier);
 
     void *result = wfdequeue(id);
 
@@ -99,6 +106,8 @@ static void *thread(void *bits) {
 
     void *result = wfdequeue(id);
 
+    printf("\n Dequeued: %ld\n", (intptr_t)result);
+
     thread_exit(id, nprocs);
     return result;
 }
@@ -114,7 +123,10 @@ int main(int argc, const char *argv[]) {
     printf("=================================================\n");
     printf("  Number of processors: %d\n", nprocs);
 
+    shm_init(SHM_FILE, NULL);
+
     init(nprocs, n);
+
 
     pthread_t ths1, ths2;
     void *res;
@@ -126,6 +138,7 @@ int main(int argc, const char *argv[]) {
 
     printf("===========================================\n");
 
+    shm_destroy();
     pthread_barrier_destroy(&barrier);
     return verify(nprocs, res);
 }
