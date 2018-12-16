@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint-gcc.h>
 #include "primitives.h"
 
 #define N WFQUEUE_NODE_SIZE
@@ -149,9 +150,6 @@ static int enq_fast(queue_t *q, handle_t *th, void *v, long *id) {
     void *cv = BOT;
 
     if (CAS(&c->val, &cv, v)) {
-#ifdef RECORD
-        th->fastenq++;
-#endif
         return 1;
     } else {
         *id = i;
@@ -193,6 +191,7 @@ static void enq_slow(queue_t *q, handle_t *th, void *v, long id) {
 }
 
 void enqueue(queue_t *q, handle_t *th, void *v) {
+
     th->hzd_node_id = th->enq_node_id;
 
     long id;

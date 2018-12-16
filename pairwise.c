@@ -37,8 +37,21 @@ void thread_init(int id, int nprocs) {
   queue_register(q, hds[id], id);
 }
 
+void wfenqueue(int id, int value) {
+  void * val = (void *) (intptr_t) value;
+  handle_t * th = hds[id];
+  enqueue(q, th, val);
+}
+
+void *wfdequeue(int id) {
+  handle_t * th = hds[id];
+  void * val = dequeue(q, th);
+  return val;
+}
+
 void * benchmark(int id, int nprocs) {
   void * val = (void *) (intptr_t) (id + 1);
+  printf("\n  Enqueueing: %ld", (intptr_t)val);
   handle_t * th = hds[id];
 
   delay_t state;
