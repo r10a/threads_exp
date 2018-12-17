@@ -16,15 +16,16 @@
 #define CACHE_ALIGNED __attribute__((aligned(CACHE_LINE_SIZE)))
 #define DOUBLE_CACHE_ALIGNED __attribute__((aligned(2 * CACHE_LINE_SIZE)))
 
-static inline void * align_malloc(size_t align, size_t size)
-{
+
 //    void * ptr = shm_malloc(size);
-    void * ptr;
-    int ret = posix_memalign(&ptr, align, size);
-    if (ret != 0) {
-        fprintf(stderr, strerror(ret));
-        abort();
-    }
+static inline void *align_malloc(size_t align, size_t size) {
+
+     void * ptr;
+     int ret = posix_memalign(&ptr, align, size);
+     if (ret != 0) {
+         fprintf(stderr, strerror(ret));
+         abort();
+     }
 
     return ptr;
 }
