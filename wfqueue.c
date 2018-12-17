@@ -109,7 +109,8 @@ static void cleanup(queue_t *q, handle_t *th) {
 
         while (old != new) {
             node_t *tmp = old->next;
-            free(old);
+//            free(old);
+            shm_free(old);
             old = tmp;
         }
     }
@@ -126,6 +127,7 @@ static cell_t *find_cell(node_t *volatile *ptr, long i, handle_t *th) {
             node_t *temp = th->spare;
 
             if (!temp) {
+//                printf("\n********************************RAN OUT OF SPACE*******************************");
                 temp = new_node();
                 th->spare = temp;
             }

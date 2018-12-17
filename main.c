@@ -12,44 +12,26 @@
 #include "shm_malloc.h"
 
 #ifndef NUM_ITERS
-#define NUM_ITERS 5
-#endif
-
-#ifndef MAX_ITERS
-#define MAX_ITERS 20
+#define NUM_ITERS 10000
 #endif
 
 #ifndef SHM_FILE
-#define SHM_FILE "tshm3_file"
+#define SHM_FILE "tshm6_file"
 #endif
+
+#define size_lt unsigned long long
+#define limiter(a) a > 1000000 ? 1 : a
 
 static pthread_barrier_t *barrier;
 static volatile int target;
 
-//size_t *timer;
-struct timespec ts;
-static size_t elapsed_time(size_t us) {
+size_lt *timer;
+static size_lt elapsed_time(size_lt us) {
     struct timeval t;
     gettimeofday(&t, NULL);
     return t.tv_sec * 1000000 + t.tv_usec - us;
 }
-
-long long unsigned *start_sh, *delta_sh;
-static inline long long unsigned time_ns(struct timespec *const ts) {
-    if (clock_gettime(CLOCK_MONOTONIC, ts)) {
-        exit(1);
-    }
-    return ((long long unsigned) ts->tv_sec) * 1000000000LLU
-           + (long long unsigned) ts->tv_nsec;
-}
-static inline void start_timer() {
-    *start_sh = time_ns(&ts);
-}
-
-static inline void stop_timer() {
-    *delta_sh = time_ns(&ts) - *start_sh;
-    printf("%llu\n", *delta_sh / 1000);
-}
+size_lt record[NUM_ITERS];
 
 void thread_init(int id, int nprocs);
 
@@ -76,13 +58,12 @@ static void *send(void *bits) {
     sched_setaffinity(0, sizeof(set), &set);
     thread_init(id, nprocs);
 
-    for (int i = 0; i < 1000; i++) {
-        printf("\n Enqueued: %d", i);
+    for (int i = 0; i < NUM_ITERS; i++) {
+//        printf("\n Enqueued: %d", i);
         pthread_barrier_wait(barrier);
 
         wfenqueue(id, i);
-//        *timer = elapsed_time(0);
-        start_timer();
+        *timer = elapsed_time(0);
     }
     thread_exit(id, nprocs);
     return 0;
@@ -99,12 +80,13 @@ static void *recv(void *bits) {
     sched_setaffinity(0, sizeof(set), &set);
     thread_init(id, nprocs);
 
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < NUM_ITERS; i++) {
         pthread_barrier_wait(barrier);
         void *result = wfdequeue(id);
-//        *timer = elapsed_time(*timer);
-        printf("\n Dequeued: %ld\n", (intptr_t) result);
-        stop_timer();
+        *timer = elapsed_time(*timer);
+//        printf("\n Dequeued: %ld | Time: %ld\n", (intptr_t) result, *timer);
+        record[i] = limiter(*timer);
+        printf("\n%d %llu",i, *timer);
     }
     thread_exit(id, nprocs);
     return 0;
@@ -119,10 +101,9 @@ int main(int argc, const char *argv[]) {
 
     shm_init(SHM_FILE, NULL);
 
-//    timer = shm_malloc(sizeof(size_t));
-//    timer = shm_malloc(sizeof(struct timespec));
-    start_sh = shm_malloc(sizeof(long long unsigned));
-    delta_sh = shm_malloc(sizeof(long long unsigned));
+    timer = shm_malloc(sizeof(size_lt));
+
+    size_lt *local_timer = shm_malloc(sizeof(size_lt));
 
     barrier = shm_malloc(sizeof(pthread_barrier_t));
 
@@ -136,15 +117,24 @@ int main(int argc, const char *argv[]) {
     init(nprocs, n);
 
     if (fork() == 0) {
-//        shm_child();
         pthread_t ths1;
         pthread_create(&ths1, NULL, recv, bits_join(1, nprocs));
+        *local_timer = elapsed_time(0);
         pthread_join(ths1, NULL);
+
+        size_lt avg = 0;
+        for(int i = 0; i < NUM_ITERS; i++) {
+            avg += record[i];
+        }
+        printf("\nAvg: %llu\n", avg/NUM_ITERS);
+//        printf("\nAvg: %lf", (double)avg);
         exit(0);
     } else {
         pthread_t ths2;
         pthread_create(&ths2, NULL, send, bits_join(2, nprocs));
         pthread_join(ths2, res);
+        *local_timer = elapsed_time(*local_timer);
+        printf("\nTOTAL: %llu\n",*local_timer/NUM_ITERS);
     }
     int status;
     while (wait(&status) > 0);
@@ -161,6 +151,7 @@ int main(int argc, const char *argv[]) {
 
     pthread_barrier_destroy(barrier);
 
+    shm_fini();
     shm_destroy();
 //    return verify(nprocs, res);
     return 0;

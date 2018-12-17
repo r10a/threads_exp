@@ -3,7 +3,7 @@ project(threads_exp C)
 
 set(CMAKE_C_COMPILER "gcc")
 
-set(CMAKE_C_FLAGS "-std=gnu99 -g -Wall -O2 -D_GNU_SOURCE -DSHM")
+set(CMAKE_C_FLAGS "-std=gnu99 -g -Wall -O3 -D_GNU_SOURCE -DSHM -DLOCKTYPE=SPINLOCK")
 
 find_package( Threads REQUIRED )
 
