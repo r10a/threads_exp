@@ -14,63 +14,63 @@ static handle_t ** hds;
 
 void init(int nprocs, int logn) {
 
-  /** Use 10^7 as default input size. */
-  if (logn == 0) logn = LOGN_OPS;
+    /** Use 10^7 as default input size. */
+    if (logn == 0) logn = LOGN_OPS;
 
-  /** Compute the number of ops to perform. */
- /* nops = 1;
-  int i;
-  for (i = 0; i < logn; ++i) {
-    nops *= 10;
-  }
+    /** Compute the number of ops to perform. */
+    /* nops = 1;
+     int i;
+     for (i = 0; i < logn; ++i) {
+       nops *= 10;
+     }
+   
+     printf("  Number of operations: %ld\n", nops);*/
 
-  printf("  Number of operations: %ld\n", nops);*/
+    q = align_malloc(PAGE_SIZE, sizeof(queue_t));
+    queue_init(q, nprocs);
 
-  q = align_malloc(PAGE_SIZE, sizeof(queue_t));
-  queue_init(q, nprocs);
-
-  hds = align_malloc(PAGE_SIZE, sizeof(handle_t * [nprocs]));
+    hds = align_malloc(PAGE_SIZE, sizeof(handle_t * [nprocs]));
 }
 
 void thread_init(int id, int nprocs) {
-  hds[id] = align_malloc(PAGE_SIZE, sizeof(handle_t));
-  queue_register(q, hds[id], id);
+    hds[id] = align_malloc(PAGE_SIZE, sizeof(handle_t));
+    queue_register(q, hds[id], id);
 }
 
 void wfenqueue(int id, int value) {
-  void * val = (void *) (intptr_t) value;
-  handle_t * th = hds[id];
-  enqueue(q, th, val);
+    void * val = (void *) (intptr_t) value;
+    handle_t * th = hds[id];
+    enqueue(q, th, val);
 }
 
 void *wfdequeue(int id) {
-  handle_t * th = hds[id];
-  void * val = dequeue(q, th);
-  return val;
+    handle_t * th = hds[id];
+    void * val = dequeue(q, th);
+    return val;
 }
 
 void * benchmark(int id, int nprocs) {
-  void * val = (void *) (intptr_t) (id + 1);
-  printf("\n  Enqueueing: %ld", (intptr_t)val);
-  handle_t * th = hds[id];
+    void * val = (void *) (intptr_t) (id + 1);
+    printf("\n  Enqueueing: %ld", (intptr_t)val);
+    handle_t * th = hds[id];
 
-  delay_t state;
-  delay_init(&state, id);
+    delay_t state;
+    delay_init(&state, id);
 
-  int i;
-  for (i = 0; i < nops / nprocs; ++i) {
-    enqueue(q, th, val);
-    delay_exec(&state);
+    int i;
+    for (i = 0; i < nops / nprocs; ++i) {
+        enqueue(q, th, val);
+        delay_exec(&state);
 
-    val = dequeue(q, th);
-    delay_exec(&state);
-  }
+        val = dequeue(q, th);
+        delay_exec(&state);
+    }
 
-  return val;
+    return val;
 }
 
 void thread_exit(int id, int nprocs) {
-  queue_free(q, hds[id]);
+    queue_free(q, hds[id]);
 }
 
 #ifdef VERIFY
@@ -81,9 +81,9 @@ static int compare(const void * a, const void * b) {
 
 int verify(int nprocs, void ** results) {
 #ifndef VERIFY
-  return 0;
+    return 0;
 #else
-  qsort(results, nprocs, sizeof(void *), compare);
+    qsort(results, nprocs, sizeof(void *), compare);
 
   int i;
   int ret = 0;

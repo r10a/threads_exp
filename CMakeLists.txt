@@ -7,7 +7,6 @@ set(CMAKE_C_FLAGS "-std=gnu99 -g -Wall -O3 -D_GNU_SOURCE -DSHM -DLOCKTYPE=SPINLO
 
 find_package( Threads REQUIRED )
 
-#add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
 add_executable(threads_exp align.h bits.h cpumap.h delay.h shm_malloc.h malloc.c malloc.h wfqueue.c wfqueue.h primitives.h pairwise.c main.c atomic.h)
 
 target_link_libraries(threads_exp -lm -lpthread -lrt)

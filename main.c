@@ -126,7 +126,7 @@ int main(int argc, const char *argv[]) {
         for(int i = 0; i < NUM_ITERS; i++) {
             avg += record[i];
         }
-        printf("\nAvg: %llu\n", avg/NUM_ITERS);
+        printf("\nAvg: %llu", avg/NUM_ITERS);
 //        printf("\nAvg: %lf", (double)avg);
         exit(0);
     } else {
@@ -134,7 +134,7 @@ int main(int argc, const char *argv[]) {
         pthread_create(&ths2, NULL, send, bits_join(2, nprocs));
         pthread_join(ths2, res);
         *local_timer = elapsed_time(*local_timer);
-        printf("\nTOTAL: %llu\n",*local_timer/NUM_ITERS);
+        printf("\nTOTAL: %llu",*local_timer/NUM_ITERS);
     }
     int status;
     while (wait(&status) > 0);
