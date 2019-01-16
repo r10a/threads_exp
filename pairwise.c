@@ -69,6 +69,14 @@ void * benchmark(int id, int nprocs) {
     return val;
 }
 
+void cleanup(int nprocs) {
+    for(int i = 0; i <= nprocs; i++) {
+        free(hds[i]);
+    }
+    free(q);
+    free(hds);
+}
+
 void thread_exit(int id, int nprocs) {
     queue_free(q, hds[id]);
 }
