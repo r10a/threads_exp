@@ -129,7 +129,7 @@ int main(int argc, const char *argv[]) {
 
     init(nprocs, n);
 
-   /* if (fork() == 0) {
+    if (fork() == 0) {
         pthread_t ths1;
         pthread_create(&ths1, NULL, recv, bits_join(1, nprocs));
         *local_timer = elapsed_time(0);
@@ -151,15 +151,15 @@ int main(int argc, const char *argv[]) {
         printf("\nTOTAL: %llu",*local_timer/NUM_ITERS);
     }
     int status;
-    while (wait(&status) > 0);*/
+    while (wait(&status) > 0);
 
-     pthread_t ths1, ths2;
+     /*pthread_t ths1, ths2;
 
      pthread_create(&ths1, NULL, send, bits_join(1, nprocs));
      pthread_create(&ths2, NULL, recv, bits_join(2, nprocs));
 
      pthread_join(ths1, NULL);
-     pthread_join(ths2, res);
+     pthread_join(ths2, res);*/
 
     printf("===========================================\n");
 
