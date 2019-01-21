@@ -13,7 +13,7 @@
 #include "shm_malloc.h"
 
 #ifndef NUM_ITERS
-#define NUM_ITERS 2000
+#define NUM_ITERS 10000
 #endif
 
 #ifndef SHM_FILE
@@ -59,16 +59,13 @@ static void *send(void *bits) {
     sched_setaffinity(0, sizeof(set), &set);
     thread_init(id, nprocs);
 
-    for (int i = 0; i < NUM_ITERS; i++) {
-//        printf("\n Enqueued: %d", i);
-        pthread_barrier_wait(barrier);
+    pthread_barrier_wait(barrier);
 
+    *starter = elapsed_time(0);
+    for (int i = 0; i < NUM_ITERS; i++) {
         wfenqueue(id, i);
-        *starter = elapsed_time(0);
-//        *timer = elapsed_time(0);
-        pthread_barrier_wait(barrier);
     }
-//    thread_exit(id, nprocs);
+
     pthread_barrier_wait(barrier);
     return 0;
 }
@@ -84,18 +81,12 @@ static void *recv(void *bits) {
     sched_setaffinity(0, sizeof(set), &set);
     thread_init(id, nprocs);
 
+    pthread_barrier_wait(barrier);
     for (int i = 0; i < NUM_ITERS; i++) {
-        pthread_barrier_wait(barrier);
         void *result = wfdequeue(id);
-        *stopper = elapsed_time(0);
-//        *timer = elapsed_time(*timer);
-//        printf("\n Dequeued: %ld | Time: %ld\n", (intptr_t) result, *timer);
-//        record[i] = limiter(*timer);
-        record[i] = *stopper - *starter;
-        printf("\n%d %ld %llu %llu %llu",i, (intptr_t) result, *stopper - *starter, *starter, *stopper);
-        pthread_barrier_wait(barrier);
     }
-//    thread_exit(id, nprocs);
+//    *stopper = elapsed_time(0);
+    printf("\nTotal: %f", (double)elapsed_time(*starter)/NUM_ITERS);
     pthread_barrier_wait(barrier);
     return 0;
 }
