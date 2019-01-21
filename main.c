@@ -13,7 +13,7 @@
 #include "shm_malloc.h"
 
 #ifndef NUM_ITERS
-#define NUM_ITERS 10000
+#define NUM_ITERS 1000000
 #endif
 
 #ifndef SHM_FILE
@@ -24,12 +24,33 @@
 
 static pthread_barrier_t *barrier;
 
-size_lt *timer;
-static size_lt elapsed_time(size_lt us) {
+size_lt *timer_us, *timer_ns;
+static long long unsigned elapsed_time_ns(long long unsigned ns) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000000000L + t.tv_nsec - ns;
+}
+
+static long long unsigned elapsed_time_us(long long unsigned us) {
     struct timeval t;
     gettimeofday(&t, NULL);
     return t.tv_sec * 1000000 + t.tv_usec - us;
 }
+
+static inline void start_timer() {
+    *timer_ns = elapsed_time_ns(0);
+    *timer_us = elapsed_time_us(0);
+}
+
+static inline void stop_timer() {
+    *timer_ns = elapsed_time_ns(*timer_ns);
+    *timer_us = elapsed_time_us(*timer_us);
+    printf("Time taken: %llu us | Per iter: %f us\n", *timer_us, ((double)*timer_us)/NUM_ITERS);
+    printf("Time taken: %llu ns | Per iter: %f ns\n", *timer_ns, ((double)*timer_ns)/NUM_ITERS);
+}
+
+
+
 size_lt record[NUM_ITERS];
 
 size_lt *starter, *stopper;
@@ -61,7 +82,8 @@ static void *send(void *bits) {
 
     pthread_barrier_wait(barrier);
 
-    *starter = elapsed_time(0);
+//    *starter = elapsed_time_us(0);
+    start_timer();
     for (int i = 0; i < NUM_ITERS; i++) {
         wfenqueue(id, i);
     }
@@ -85,8 +107,9 @@ static void *recv(void *bits) {
     for (int i = 0; i < NUM_ITERS; i++) {
         void *result = wfdequeue(id);
     }
-//    *stopper = elapsed_time(0);
-    printf("\nTotal: %f", (double)elapsed_time(*starter)/NUM_ITERS);
+    stop_timer();
+//    *stopper = elapsed_time_us(0);
+    printf("\nTotal: %f", (double) elapsed_time_us(*starter)/NUM_ITERS);
     pthread_barrier_wait(barrier);
     return 0;
 }
@@ -102,7 +125,8 @@ int main(int argc, const char *argv[]) {
 
     shm_init(SHM_FILE, NULL);
 
-    timer = shm_malloc(sizeof(size_lt));
+    timer_us = shm_malloc(sizeof(size_lt));
+    timer_ns = shm_malloc(sizeof(size_lt));
 
     starter = shm_malloc(sizeof(size_lt));
     stopper = shm_malloc(sizeof(size_lt));
@@ -123,7 +147,7 @@ int main(int argc, const char *argv[]) {
     if (fork() == 0) {
         pthread_t ths1;
         pthread_create(&ths1, NULL, recv, bits_join(1, nprocs));
-        *local_timer = elapsed_time(0);
+        *local_timer = elapsed_time_us(0);
         pthread_join(ths1, NULL);
 
         size_lt avg = 0;
@@ -138,7 +162,7 @@ int main(int argc, const char *argv[]) {
         pthread_t ths2;
         pthread_create(&ths2, NULL, send, bits_join(2, nprocs));
         pthread_join(ths2, res);
-        *local_timer = elapsed_time(*local_timer);
+        *local_timer = elapsed_time_us(*local_timer);
         printf("\nTOTAL: %llu",*local_timer/NUM_ITERS);
     }
     int status;
