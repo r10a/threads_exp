@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 199309L
 #define _GNU_SOURCE
+
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,10 @@
 #include <pthread.h>
 #include <bits/time.h>
 #include <time.h>
+#include <sys/time.h>
 #include "../utils.h"
+
+#define NUM_ITERS 1000
 
 static inline long long unsigned time_ns(struct timespec *const ts) {
     if (clock_gettime(CLOCK_REALTIME, ts)) {
@@ -22,6 +26,18 @@ static inline long long unsigned time_ns(struct timespec *const ts) {
            + (long long unsigned) ts->tv_nsec;
 }
 
+static long long unsigned elapsed_time(long long unsigned ns) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000000000L + t.tv_nsec - ns;
+}
+
+static long long unsigned elapsed_time_us(long long unsigned us) {
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return t.tv_sec * 1000000 + t.tv_usec - us;
+}
+
 void *child();
 
 void *parent();
@@ -29,15 +45,15 @@ void *parent();
 struct timespec ts;
 long long unsigned *start_sh, *delta_sh;
 int *futex;
-const int iterations = 10000;
+const int iterations = NUM_ITERS;
 
 static inline void start_timer() {
-    *start_sh = time_ns(&ts);
+    *start_sh = elapsed_time_us(0);
 }
 
 static inline void stop_timer() {
-    *delta_sh = time_ns(&ts) - *start_sh;
-    printf("%llu\n", *delta_sh / 1000);
+    *start_sh = elapsed_time_us(*start_sh);
+    printf("%llu\n", *start_sh/NUM_ITERS);
 }
 
 int main(void) {
@@ -68,7 +84,7 @@ int main(void) {
     pthread_join(thread, NULL);
     const long long unsigned delta = time_ns(&ts) - start_ns;
 
-    printf("Time taken: %lluns (%.1f us/msg)\n", delta, (delta / (float) iterations / 2000));
+    printf("Time taken: %lluns (%.1f ns/msg)\n", delta, ((float)delta / iterations));
     wait(futex);
     munmap(start_sh, sizeof(long long unsigned));
     munmap(delta_sh, sizeof(long long unsigned));
@@ -86,20 +102,20 @@ void *child() {
             // retry
             sched_yield();
         }
-        stop_timer();
         *futex = 0xB;
         while (!syscall(SYS_futex, futex, FUTEX_WAKE, 1, NULL, NULL, 42)) {
             // retry
             sched_yield();
         }
     }
+    stop_timer();
     return 0;
 }
 
 void *parent() {
+    start_timer();
     for (int i = 0; i < iterations; i++) {
         *futex = 0xA;
-        start_timer();
         while (!syscall(SYS_futex, futex, FUTEX_WAKE, 1, NULL, NULL, 42)) {
             // retry
             sched_yield();
