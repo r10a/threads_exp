@@ -10,11 +10,15 @@ typedef struct socket_buf {
     int buf;
 } sock;
 
+typedef struct params {
+    int id;
+    struct socket_buf sock;
+} params;
 
-inline void init_socket(sock* sock);
+void init_socket(sock* sock);
 
-inline void send_msg(sock* sock, int msg);
+void send_msg(sock* sock, int msg);
 
-inline void recv_msg(sock* sock);
+void recv_msg(sock* sock);
 
 #endif //THREADS_EXP_SOCKETS_H

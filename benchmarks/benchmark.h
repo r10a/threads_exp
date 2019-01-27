@@ -13,4 +13,10 @@ static inline size_lt elapsed_time_ns(size_lt ns);
 
 static inline size_lt elapsed_time_us(size_lt us);
 
+static inline void* sender(void* params);
+
+static inline void* receiver(void* params);
+
+int assign_thread_to_core(int core_id, pthread_t pthread);
+
 #endif //THREADS_EXP_BENCHMARK_H
