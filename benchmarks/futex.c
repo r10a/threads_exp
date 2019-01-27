@@ -16,17 +16,21 @@
 #include <sys/time.h>
 #include "../utils.h"
 
+#define TV_1 "/TIME1"
+#define TV_2 "/TIME2"
 #define NUM_ITERS 1000
 
-static inline long long unsigned time_ns(struct timespec *const ts) {
-    if (clock_gettime(CLOCK_REALTIME, ts)) {
-        exit(1);
-    }
-    return ((long long unsigned) ts->tv_sec) * 1000000000LLU
-           + (long long unsigned) ts->tv_nsec;
-}
+void *child();
 
-static long long unsigned elapsed_time(long long unsigned ns) {
+void *parent();
+
+int *futex;
+#define size_lt unsigned long long
+
+size_lt results[NUM_ITERS];
+size_lt *timer_us, *timer_ns;
+
+static long long unsigned elapsed_time_ns(long long unsigned ns) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1000000000L + t.tv_nsec - ns;
@@ -38,83 +42,83 @@ static long long unsigned elapsed_time_us(long long unsigned us) {
     return t.tv_sec * 1000000 + t.tv_usec - us;
 }
 
-void *child();
-
-void *parent();
-
-struct timespec ts;
-long long unsigned *start_sh, *delta_sh;
-int *futex;
-const int iterations = NUM_ITERS;
-
 static inline void start_timer() {
-    *start_sh = elapsed_time_us(0);
+    *timer_ns = elapsed_time_ns(0);
+//    *timer_us = elapsed_time_us(0);
 }
 
-static inline void stop_timer() {
-    *start_sh = elapsed_time_us(*start_sh);
-    printf("%llu\n", *start_sh/NUM_ITERS);
+static inline size_lt stop_timer() {
+//    *timer_ns = elapsed_time_ns(*timer_ns);
+//    *timer_us = elapsed_time_us(*timer_us);
+//    printf("Time taken: %llu us | Per iter: %f us\n", *timer_us, ((double)*timer_us)/NUM_ITERS);
+//    printf("Time taken: %llu ns | Per iter: %f ns\n", *timer_ns, ((double)*timer_ns)/NUM_ITERS);
+    return elapsed_time_ns(*timer_ns);
 }
+
 
 int main(void) {
 
-    int ts1, m, ts2;
-    start_sh = (long long unsigned *) mmap(NULL, sizeof(long long unsigned), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                           create_shm(&ts1, "/time1", sizeof(long long unsigned)), 0);
-    delta_sh = (long long unsigned *) mmap(NULL, sizeof(long long unsigned), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                           create_shm(&ts2, "/time2", sizeof(long long unsigned)), 0);
+    int t1, t2, m;
+
+    timer_us = (size_lt *) mmap(NULL, sizeof(size_lt), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                create_shm(&t1, TV_1, sizeof(size_lt)), 0);
+    timer_ns = (size_lt *) mmap(NULL, sizeof(size_lt), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                create_shm(&t2, TV_2, sizeof(size_lt)), 0);
     futex = (int *) mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED,
                          create_shm(&m, "/msg", sizeof(int)), 0);
-    const pid_t other = fork();
     *futex = 0xA;
+    const pid_t other = fork();
     if (other == 0) {
-        assign_curr_process_to_core(1);
+        assign_curr_process_to_core(2);
         pthread_t thread;
-        pthread_create(&thread, NULL, child, NULL);
-        assign_thread_to_core(1, thread);
+        pthread_create(&thread, NULL, parent, NULL);
+        assign_thread_to_core(2, thread);
         pthread_join(thread, NULL);
         exit(0);
     }
-
-    assign_curr_process_to_core(2);
-    const long long unsigned start_ns = time_ns(&ts);
+    assign_curr_process_to_core(1);
     pthread_t thread;
-    pthread_create(&thread, NULL, parent, NULL);
-    assign_thread_to_core(2, thread);
+    pthread_create(&thread, NULL, child, NULL);
+    assign_thread_to_core(1, thread);
     pthread_join(thread, NULL);
-    const long long unsigned delta = time_ns(&ts) - start_ns;
 
-    printf("Time taken: %lluns (%.1f ns/msg)\n", delta, ((float)delta / iterations));
+
+    size_lt sum = 0;
+    for (int i = 0; i < NUM_ITERS; i++) {
+        sum += results[i];
+    }
+    printf("Total: %llu | Mean: %f", sum, ((double) sum) / NUM_ITERS);
+
     wait(futex);
-    munmap(start_sh, sizeof(long long unsigned));
-    munmap(delta_sh, sizeof(long long unsigned));
     munmap(futex, sizeof(int));
-    shm_unlink("/time1");
-    shm_unlink("/time2");
+    munmap(timer_us, sizeof(size_lt));
+    munmap(timer_ns, sizeof(size_lt));
+    shm_unlink(TV_1);
+    shm_unlink(TV_2);
     shm_unlink("/msg");
     return 0;
 }
 
 void *child() {
-    for (int i = 0; i < iterations; i++) {
+    for (int i = 0; i < NUM_ITERS; i++) {
         sched_yield();
         while (syscall(SYS_futex, futex, FUTEX_WAIT, 0xA, NULL, NULL, 42)) {
             // retry
             sched_yield();
         }
+        results[i] = stop_timer();
         *futex = 0xB;
         while (!syscall(SYS_futex, futex, FUTEX_WAKE, 1, NULL, NULL, 42)) {
             // retry
             sched_yield();
         }
     }
-    stop_timer();
     return 0;
 }
 
 void *parent() {
-    start_timer();
-    for (int i = 0; i < iterations; i++) {
+    for (int i = 0; i < NUM_ITERS; i++) {
+        start_timer();
         *futex = 0xA;
         while (!syscall(SYS_futex, futex, FUTEX_WAKE, 1, NULL, NULL, 42)) {
             // retry
