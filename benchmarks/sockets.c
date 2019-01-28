@@ -30,8 +30,8 @@ void init_socket(sock* sock) {
         exit(1);
     }
     struct timeval tv;
-    tv.tv_sec = 1;
-    tv.tv_usec = 0;
+    tv.tv_sec = 0;
+    tv.tv_usec = 1;
     setsockopt(sock->sv[1], SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 
 }
