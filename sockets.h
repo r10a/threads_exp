@@ -7,7 +7,7 @@
 
 typedef struct socket_buf {
     int sv[2];
-    int buf;
+    long long buf;
 } sock;
 
 typedef struct params {

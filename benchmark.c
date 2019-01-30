@@ -28,7 +28,7 @@
 #define NUM_RUNS 5
 #endif
 
-#define NUM_THREAD 8
+#define NUM_THREAD 6
 
 pthread_barrier_t *barrier, *tmp_barrier;
 
@@ -68,25 +68,25 @@ int main() {
 
     /** One socket
      * */
-    sock sock12, sock23;
+    /*sock sock12, sock23;
     init_socket(&sock12);
-    init_socket(&sock23);
+    init_socket(&sock23);*/
 
     /** One socket per thread
      * */
-    /*sock sock12[NUM_THREAD], sock23[NUM_THREAD];
+    sock sock12[NUM_THREAD], sock23[NUM_THREAD];
     for(int i = 0; i < NUM_THREAD; i++) {
         init_socket(&sock12[i]);
         init_socket(&sock23[i]);
-    }*/
+    }
 
     printf("\n======================initialized=====================\n");
 
     params p[NUM_THREAD];
     for(int i = 0; i < NUM_THREAD; i++) {
         p[i].id = i;
-        p[i].sock12 = sock12;
-        p[i].sock23 = sock23;
+        p[i].sock12 = sock12[i];
+        p[i].sock23 = sock23[i];
     }
 
     if (fork() == 0) {
@@ -174,14 +174,14 @@ static void *sender(void *par) {
 
         size_lt timer_overhead = start[j] - delay[j];
         time[j] = end[j] - start[j] - timer_overhead;
-        printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j], ((double) time[j]) / NUM_ITERS, id);
+        printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j], ((double) time[j]) / NUM_ITERS / 2, id);
         printf("Verify S: %llu\n", s->buf);
     }
     size_lt avg = 0;
     for(int j = 0; j < NUM_RUNS; j++) {
         avg += llround(((double) time[j]) / NUM_ITERS);
     }
-    s->buf = llround(((double) avg) / NUM_RUNS);
+    s->buf = llround(((double) avg) / NUM_RUNS / 2);
     return 0;
 }
 
@@ -196,9 +196,10 @@ static void *intermediate(void *par) {
 
         for (int i = 0; i < NUM_ITERS; i++) {
             read(s12->sv[1], &s12->buf, sizeof(s12->buf));
-            write(s23->sv[0], &s12->buf, sizeof(s12->buf));
-            read(s23->sv[0], &s23->buf, sizeof(s23->buf));
-            write(s12->sv[1], &s23->buf, sizeof(s23->buf));
+//            write(s23->sv[0], &s12->buf, sizeof(s12->buf));
+//            read(s23->sv[0], &s23->buf, sizeof(s23->buf));
+//            write(s12->sv[1], &s23->buf, sizeof(s23->buf));
+            write(s12->sv[1], &s12->buf, sizeof(s12->buf));
         }
     }
     printf("Intermediate completed\n");
@@ -214,8 +215,8 @@ static void *receiver(void *par) {
     for(int j = 0; j < NUM_RUNS; j++) {
         pthread_barrier_wait(barrier);
         for (int i = 0; i < NUM_ITERS; i++) {
-            read(s23->sv[1], &s23->buf, sizeof(s23->buf));
-            write(s23->sv[1], &s23->buf, sizeof(s23->buf));
+//            read(s23->sv[1], &s23->buf, sizeof(s23->buf));
+//            write(s23->sv[1], &s23->buf, sizeof(s23->buf));
         }
     }
     printf("Receiver completed\n");
