@@ -25,10 +25,10 @@
 #endif
 
 #ifndef NUM_RUNS
-#define NUM_RUNS 3
+#define NUM_RUNS 5
 #endif
 
-#define NUM_THREAD 2
+#define NUM_THREAD 8
 
 pthread_barrier_t *barrier, *tmp_barrier;
 
@@ -74,7 +74,7 @@ int main() {
 
     /** One socket per thread
      * */
-   /* sock sock12[NUM_THREAD], sock23[NUM_THREAD];
+    /*sock sock12[NUM_THREAD], sock23[NUM_THREAD];
     for(int i = 0; i < NUM_THREAD; i++) {
         init_socket(&sock12[i]);
         init_socket(&sock23[i]);
@@ -99,6 +99,14 @@ int main() {
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_join(s_threads[i], NULL);
         }
+
+        size_lt avg = 0, min = INT_MAX, max = 0;
+        for (int i = 0; i < NUM_THREAD; i++) {
+            avg += p[i].sock12.buf;
+            min = min > p[i].sock12.buf ? p[i].sock12.buf : min;
+            max = max > p[i].sock12.buf ? max : p[i].sock12.buf;
+        }
+        printf("Avg time taken: %f ns | Max: %llu | Min: %llu\n", ((double) avg) / NUM_THREAD, max, min);
         printf("Process 1 completed\n");
         exit(0);
     }
@@ -135,15 +143,6 @@ int main() {
     int status;
     while (wait(&status) > 0) printf("Process exit status: %d\n", status);
 
-    size_lt sum = 0, min = INT_MAX, max = 0;
-    for (int i = 0; i < NUM_ITERS; i++) {
-//        printf("\n%llu", start_g[i]);
-        size_lt timer_overhead = start_g[i] - delay_g[i];
-        size_lt time = end_g[i] - start_g[i] - timer_overhead;
-        sum += time;
-        min = min < time ? min : time;
-        max = max > time ? max : time;
-    }
 //    printf("Time taken: %llu ns | Per iter: %f ns | Max: %llu | Min: %llu\n", sum, ((double) sum) / NUM_ITERS, max, min);
     printf("\n=======================================================\n");
     pthread_barrier_destroy(tmp_barrier);
@@ -157,26 +156,32 @@ static void *sender(void *par) {
     sock *s = &p->sock12;
     printf("Senders: %d %d \n", s->sv[0], s->sv[1]);
     int id = p->id;
-    size_lt start;
-    size_lt end;
-    size_lt delay;
+    size_lt start[NUM_RUNS];
+    size_lt end[NUM_RUNS];
+    size_lt delay[NUM_RUNS];
+    size_lt time[NUM_RUNS];
 
     for(int j = 0; j < NUM_RUNS; j++) {
         pthread_barrier_wait(barrier);
 
-        delay = elapsed_time_ns(0);
-        start = elapsed_time_ns(0);
+        delay[j] = elapsed_time_ns(0);
+        start[j] = elapsed_time_ns(0);
         for (int i = 0; i < NUM_ITERS; i++) {
-            write(s->sv[0], &i, sizeof(i));
+            write(s->sv[0], &i, sizeof(s->buf));
             read(s->sv[0], &s->buf, sizeof(s->buf));
         }
-        end = elapsed_time_ns(0);
+        end[j] = elapsed_time_ns(0);
 
-        size_lt timer_overhead = start - delay;
-        size_lt time = end - start - timer_overhead;
-        printf("Time taken for #%d: %llu ns | Per iter: %f ns\n", j, time, ((double) time) / NUM_ITERS);
-        printf("Verify S: %d\n", s->buf);
+        size_lt timer_overhead = start[j] - delay[j];
+        time[j] = end[j] - start[j] - timer_overhead;
+        printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j], ((double) time[j]) / NUM_ITERS, id);
+        printf("Verify S: %llu\n", s->buf);
     }
+    size_lt avg = 0;
+    for(int j = 0; j < NUM_RUNS; j++) {
+        avg += llround(((double) time[j]) / NUM_ITERS);
+    }
+    s->buf = llround(((double) avg) / NUM_RUNS);
     return 0;
 }
 
