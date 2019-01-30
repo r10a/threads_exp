@@ -13,7 +13,7 @@
 #include <string.h>
 #include <asm/errno.h>
 #include "shm_malloc.h"
-#include "sockets.h"
+#include "pipe.h"
 #include "benchmark.h"
 
 #ifndef SHM_FILE
@@ -64,9 +64,11 @@ int main() {
 
     /** One socket
      * */
-    sock sock12, sock23;
-    init_socket(&sock12);
-    init_socket(&sock23);
+    pipe_t pipe12, pipe23, pipe32, pipe21;
+    init_pipe(&pipe12);
+    init_pipe(&pipe23);
+    init_pipe(&pipe32);
+    init_pipe(&pipe21);
 
     /** One socket per thread
      * */
@@ -81,8 +83,10 @@ int main() {
     params p[NUM_THREAD];
     for(int i = 0; i < NUM_THREAD; i++) {
         p[i].id = i;
-        p[i].sock12 = sock12;
-        p[i].sock23 = sock23;
+        p[i].pipe12 = pipe12;
+        p[i].pipe23 = pipe23;
+        p[i].pipe32 = pipe32;
+        p[i].pipe21 = pipe21;
     }
 
     if (fork() == 0) {
@@ -150,37 +154,40 @@ int main() {
 
 static void *sender(void *par) {
     params *p = (params *) par;
-    sock *s = &p->sock12;
-    printf("Senders: %d %d \n", s->sv[0], s->sv[1]);
+    pipe_t *p12 = &p->pipe12;
+    pipe_t *p21 = &p->pipe21;
+    printf("Senders: %d %d %d %d \n", p12->p[0], p12->p[1], p21->p[0], p21->p[1]);
     int id = p->id;
     pthread_barrier_wait(barrier);
     for (int i = 0; i < NUM_ITERS; i++) {
+        pthread_barrier_wait(tmp_barrier);
         delay[i] = elapsed_time_ns(0);
         start[i] = elapsed_time_ns(0);
-        write(s->sv[0], &i, sizeof(i));
-        pthread_barrier_wait(tmp_barrier);
-        read(s->sv[0], &s->buf, sizeof(s->buf));
+//        write(s->sv[0], &i, sizeof(i));
+//        read(s->sv[0], &s->buf, sizeof(s->buf));
 //        pthread_barrier_wait(barrier);
 //        end[i] = elapsed_time_ns(0);
     }
-    printf("Verify S: %d\n", s->buf);
+    printf("Verify S: %d\n", p21->buf);
     return 0;
 }
 
 static void *intermediate(void *par) {
     params *p = (params *) par;
-    sock *s12 = &p->sock12;
-    sock *s23 = &p->sock23;
-    printf("Intermediates: %d %d %d %d\n", s12->sv[0], s12->sv[1], s23->sv[0], s23->sv[1]);
+    pipe_t *p12 = &p->pipe12;
+    pipe_t *p23 = &p->pipe23;
+    pipe_t *p32 = &p->pipe32;
+    pipe_t *p21 = &p->pipe21;
+    printf("Intermediates: %d %d %d %d %d %d %d %d\n", p12->p[0], p12->p[1], p23->p[0], p23->p[1], p32->p[0], p32->p[1], p21->p[0], p21->p[1]);
     int id = p->id;
     pthread_barrier_wait(barrier);
     for (int i = 0; i < NUM_ITERS; i++) {
-        read(s12->sv[1], &s12->buf, sizeof(s12->buf));
         pthread_barrier_wait(tmp_barrier);
+//        read(s12->sv[1], &s12->buf, sizeof(s12->buf));
         end[i] = elapsed_time_ns(0);
-        write(s23->sv[0], &s12->buf, sizeof(s12->buf));
-        read(s23->sv[0], &s23->buf, sizeof(s23->buf));
-        write(s12->sv[1], &s23->buf, sizeof(s23->buf));
+//        write(s23->sv[0], &s12->buf, sizeof(s12->buf));
+//        read(s23->sv[0], &s23->buf, sizeof(s23->buf));
+//        write(s12->sv[1], &s23->buf, sizeof(s23->buf));
 //        pthread_barrier_wait(barrier);
     }
 //    printf("Intermediate completed\n");
@@ -190,13 +197,14 @@ static void *intermediate(void *par) {
 
 static void *receiver(void *par) {
     params *p = (params *) par;
-    sock *s23 = &p->sock23;
-    printf("Receivers: %d %d \n", s23->sv[0], s23->sv[1]);
+    pipe_t *p23 = &p->pipe23;
+    pipe_t *p32 = &p->pipe32;
+    printf("Receivers: %d %d %d %d \n", p23->p[0], p23->p[1], p32->p[0], p32->p[1]);
     int id = p->id;
     pthread_barrier_wait(barrier);
     for (int i = 0; i < NUM_ITERS; i++) {
-        read(s23->sv[1], &s23->buf, sizeof(s23->buf));
-        write(s23->sv[1], &s23->buf, sizeof(s23->buf));
+//        read(s23->sv[1], &s23->buf, sizeof(s23->buf));
+//        write(s23->sv[1], &s23->buf, sizeof(s23->buf));
 //        pthread_barrier_wait(barrier);
     }
 //    printf("Receiver completed\n");
