@@ -24,11 +24,15 @@
 #define NUM_ITERS 1000000
 #endif
 
-#define NUM_THREAD 1
+#ifndef NUM_RUNS
+#define NUM_RUNS 3
+#endif
+
+#define NUM_THREAD 2
 
 pthread_barrier_t *barrier, *tmp_barrier;
 
-volatile size_lt *start, *end, *delay;
+volatile size_lt *start_g, *end_g, *delay_g;
 
 static inline size_lt elapsed_time_ns(size_lt ns) {
     struct timespec t;
@@ -52,9 +56,9 @@ int main() {
     shm_init(SHM_FILE, NULL);
     barrier = shm_malloc(sizeof(pthread_barrier_t));
     tmp_barrier = shm_malloc(sizeof(pthread_barrier_t));
-    start = shm_malloc(sizeof(size_lt)*NUM_ITERS);
-    end = shm_malloc(sizeof(size_lt)*NUM_ITERS);
-    delay = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    start_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    end_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    delay_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
 
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
@@ -133,14 +137,14 @@ int main() {
 
     size_lt sum = 0, min = INT_MAX, max = 0;
     for (int i = 0; i < NUM_ITERS; i++) {
-//        printf("\n%llu", start[i]);
-        size_lt timer_overhead = start[i] - delay[i];
-        size_lt time = end[i] - start[i] - timer_overhead;
+//        printf("\n%llu", start_g[i]);
+        size_lt timer_overhead = start_g[i] - delay_g[i];
+        size_lt time = end_g[i] - start_g[i] - timer_overhead;
         sum += time;
         min = min < time ? min : time;
         max = max > time ? max : time;
     }
-    printf("Time taken: %llu ns | Per iter: %f ns | Max: %llu | Min: %llu\n", sum, ((double) sum) / NUM_ITERS, max, min);
+//    printf("Time taken: %llu ns | Per iter: %f ns | Max: %llu | Min: %llu\n", sum, ((double) sum) / NUM_ITERS, max, min);
     printf("\n=======================================================\n");
     pthread_barrier_destroy(tmp_barrier);
     pthread_barrier_destroy(barrier);
@@ -153,17 +157,26 @@ static void *sender(void *par) {
     sock *s = &p->sock12;
     printf("Senders: %d %d \n", s->sv[0], s->sv[1]);
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-        delay[i] = elapsed_time_ns(0);
-        start[i] = elapsed_time_ns(0);
-        write(s->sv[0], &i, sizeof(i));
-        pthread_barrier_wait(tmp_barrier);
-        read(s->sv[0], &s->buf, sizeof(s->buf));
-//        pthread_barrier_wait(barrier);
-//        end[i] = elapsed_time_ns(0);
+    size_lt start;
+    size_lt end;
+    size_lt delay;
+
+    for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+
+        delay = elapsed_time_ns(0);
+        start = elapsed_time_ns(0);
+        for (int i = 0; i < NUM_ITERS; i++) {
+            write(s->sv[0], &i, sizeof(i));
+            read(s->sv[0], &s->buf, sizeof(s->buf));
+        }
+        end = elapsed_time_ns(0);
+
+        size_lt timer_overhead = start - delay;
+        size_lt time = end - start - timer_overhead;
+        printf("Time taken for #%d: %llu ns | Per iter: %f ns\n", j, time, ((double) time) / NUM_ITERS);
+        printf("Verify S: %d\n", s->buf);
     }
-    printf("Verify S: %d\n", s->buf);
     return 0;
 }
 
@@ -173,17 +186,17 @@ static void *intermediate(void *par) {
     sock *s23 = &p->sock23;
     printf("Intermediates: %d %d %d %d\n", s12->sv[0], s12->sv[1], s23->sv[0], s23->sv[1]);
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-        read(s12->sv[1], &s12->buf, sizeof(s12->buf));
-        pthread_barrier_wait(tmp_barrier);
-        end[i] = elapsed_time_ns(0);
-        write(s23->sv[0], &s12->buf, sizeof(s12->buf));
-        read(s23->sv[0], &s23->buf, sizeof(s23->buf));
-        write(s12->sv[1], &s23->buf, sizeof(s23->buf));
-//        pthread_barrier_wait(barrier);
+    for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+
+        for (int i = 0; i < NUM_ITERS; i++) {
+            read(s12->sv[1], &s12->buf, sizeof(s12->buf));
+            write(s23->sv[0], &s12->buf, sizeof(s12->buf));
+            read(s23->sv[0], &s23->buf, sizeof(s23->buf));
+            write(s12->sv[1], &s23->buf, sizeof(s23->buf));
+        }
     }
-//    printf("Intermediate completed\n");
+    printf("Intermediate completed\n");
 //    printf("Verify I: %d\n", s23->buf);
     return 0;
 }
@@ -193,13 +206,14 @@ static void *receiver(void *par) {
     sock *s23 = &p->sock23;
     printf("Receivers: %d %d \n", s23->sv[0], s23->sv[1]);
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-        read(s23->sv[1], &s23->buf, sizeof(s23->buf));
-        write(s23->sv[1], &s23->buf, sizeof(s23->buf));
-//        pthread_barrier_wait(barrier);
+    for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+        for (int i = 0; i < NUM_ITERS; i++) {
+            read(s23->sv[1], &s23->buf, sizeof(s23->buf));
+            write(s23->sv[1], &s23->buf, sizeof(s23->buf));
+        }
     }
-//    printf("Receiver completed\n");
+    printf("Receiver completed\n");
 //    printf("Verify R: %d\n", s23->buf);
     return 0;
 }
