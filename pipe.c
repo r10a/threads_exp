@@ -21,8 +21,11 @@
 //static int sv[2]; /* the pair of socket descriptors */
 //static int buf; /* for data exchange between processes */
 
-void init_pipe(pipe_t* pipe) {
-
+void init_pipe(pipe_t* pip) {
+    if (pipe(pip->p) == -1) {
+        perror("pipe");
+        exit(1);
+    }
 }
 
 /*

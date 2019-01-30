@@ -5,9 +5,11 @@
 #ifndef THREADS_EXP_SOCKETS_H
 #define THREADS_EXP_SOCKETS_H
 
+#define CACHE_LINE_SIZE 64
+
 typedef struct pipe_t {
     int p[2];
-    int buf;
+    long long buf __attribute__((aligned(CACHE_LINE_SIZE)));
 } pipe_t;
 
 typedef struct params {

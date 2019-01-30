@@ -24,11 +24,15 @@
 #define NUM_ITERS 1000000
 #endif
 
+#ifndef NUM_RUNS
+#define NUM_RUNS 3
+#endif
+
 #define NUM_THREAD 1
 
 pthread_barrier_t *barrier, *tmp_barrier;
 
-volatile size_lt *start, *end, *delay;
+volatile size_lt *start_g, *end_g, *delay_g;
 
 static inline size_lt elapsed_time_ns(size_lt ns) {
     struct timespec t;
@@ -52,9 +56,9 @@ int main() {
     shm_init(SHM_FILE, NULL);
     barrier = shm_malloc(sizeof(pthread_barrier_t));
     tmp_barrier = shm_malloc(sizeof(pthread_barrier_t));
-    start = shm_malloc(sizeof(size_lt)*NUM_ITERS);
-    end = shm_malloc(sizeof(size_lt)*NUM_ITERS);
-    delay = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    start_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    end_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
+    delay_g = shm_malloc(sizeof(size_lt)*NUM_ITERS);
 
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
@@ -72,10 +76,12 @@ int main() {
 
     /** One socket per thread
      * */
-   /* sock sock12[NUM_THREAD], sock23[NUM_THREAD];
+    /*pipe_t pipe12[NUM_THREAD], pipe23[NUM_THREAD], pipe32[NUM_THREAD], pipe21[NUM_THREAD];
     for(int i = 0; i < NUM_THREAD; i++) {
-        init_socket(&sock12[i]);
-        init_socket(&sock23[i]);
+        init_pipe(&pipe12[i]);
+        init_pipe(&pipe23[i]);
+        init_pipe(&pipe32[i]);
+        init_pipe(&pipe21[i]);
     }*/
 
     printf("\n======================initialized=====================\n");
@@ -90,7 +96,7 @@ int main() {
     }
 
     if (fork() == 0) {
-        pthread_t s_threads[NUM_THREAD];
+       pthread_t s_threads[NUM_THREAD];
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_create(&s_threads[i], NULL, sender, &p[i]);
             assign_thread_to_core(i, s_threads[i]);
@@ -99,6 +105,14 @@ int main() {
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_join(s_threads[i], NULL);
         }
+
+        size_lt avg = 0, min = INT_MAX, max = 0;
+        for (int i = 0; i < NUM_THREAD; i++) {
+            avg += p[i].pipe21.buf;
+            min = min > p[i].pipe21.buf ? p[i].pipe21.buf : min;
+            max = max > p[i].pipe21.buf ? max : p[i].pipe21.buf;
+        }
+        printf("Avg time taken: %f ns | Max: %llu | Min: %llu\n", ((double) avg) / NUM_THREAD, max, min);
         printf("Process 1 completed\n");
         exit(0);
     }
@@ -135,16 +149,8 @@ int main() {
     int status;
     while (wait(&status) > 0) printf("Process exit status: %d\n", status);
 
-    size_lt sum = 0, min = INT_MAX, max = 0;
-    for (int i = 0; i < NUM_ITERS; i++) {
-//        printf("\n%llu", start[i]);
-        size_lt timer_overhead = start[i] - delay[i];
-        size_lt time = end[i] - start[i] - timer_overhead;
-        sum += time;
-        min = min < time ? min : time;
-        max = max > time ? max : time;
-    }
-    printf("Time taken: %llu ns | Per iter: %f ns | Max: %llu | Min: %llu\n", sum, ((double) sum) / NUM_ITERS, max, min);
+
+//		printf("Time taken: %llu ns | Per iter: %f ns | Max: %llu | Min: %llu\n", sum, ((double) sum) / NUM_ITERS, max, min);
     printf("\n=======================================================\n");
     pthread_barrier_destroy(tmp_barrier);
     pthread_barrier_destroy(barrier);
@@ -155,20 +161,44 @@ int main() {
 static void *sender(void *par) {
     params *p = (params *) par;
     pipe_t *p12 = &p->pipe12;
+    pipe_t *p23 = &p->pipe23;
+    pipe_t *p32 = &p->pipe32;
     pipe_t *p21 = &p->pipe21;
     printf("Senders: %d %d %d %d \n", p12->p[0], p12->p[1], p21->p[0], p21->p[1]);
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-        pthread_barrier_wait(tmp_barrier);
-        delay[i] = elapsed_time_ns(0);
-        start[i] = elapsed_time_ns(0);
-//        write(s->sv[0], &i, sizeof(i));
-//        read(s->sv[0], &s->buf, sizeof(s->buf));
-//        pthread_barrier_wait(barrier);
-//        end[i] = elapsed_time_ns(0);
+	size_lt start[NUM_RUNS];
+    size_lt end[NUM_RUNS];
+    size_lt delay[NUM_RUNS];
+    size_lt time[NUM_RUNS];
+
+    close(p12->p[0]);
+    close(p21->p[1]);
+    close(p23->p[0]);
+    close(p23->p[1]);
+    close(p32->p[0]);
+    close(p32->p[1]);
+
+    for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+
+        delay[j] = elapsed_time_ns(0);
+        start[j] = elapsed_time_ns(0);
+        for (int i = 0; i < NUM_ITERS; i++) {
+            write(p12->p[1], &i, sizeof(p12->buf));
+            read(p21->p[0], &p21->buf, sizeof(p21->buf));
+        }
+        end[j] = elapsed_time_ns(0);
+
+        size_lt timer_overhead = start[j] - delay[j];
+        time[j] = end[j] - start[j] - timer_overhead;
+        printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j], ((double) time[j]) / NUM_ITERS, id);
+        printf("Verify S: %llu\n", p21->buf);
     }
-    printf("Verify S: %d\n", p21->buf);
+    size_lt avg = 0;
+    for(int j = 0; j < NUM_RUNS; j++) {
+        avg += llround(((double) time[j]) / NUM_ITERS);
+    }
+    p21->buf = llround(((double) avg) / NUM_RUNS);
     return 0;
 }
 
@@ -179,35 +209,51 @@ static void *intermediate(void *par) {
     pipe_t *p32 = &p->pipe32;
     pipe_t *p21 = &p->pipe21;
     printf("Intermediates: %d %d %d %d %d %d %d %d\n", p12->p[0], p12->p[1], p23->p[0], p23->p[1], p32->p[0], p32->p[1], p21->p[0], p21->p[1]);
+
+    close(p12->p[1]);
+    close(p21->p[0]);
+    close(p23->p[0]);
+    close(p32->p[1]);
+
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-        pthread_barrier_wait(tmp_barrier);
-//        read(s12->sv[1], &s12->buf, sizeof(s12->buf));
-        end[i] = elapsed_time_ns(0);
-//        write(s23->sv[0], &s12->buf, sizeof(s12->buf));
-//        read(s23->sv[0], &s23->buf, sizeof(s23->buf));
-//        write(s12->sv[1], &s23->buf, sizeof(s23->buf));
-//        pthread_barrier_wait(barrier);
+     for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+
+        for (int i = 0; i < NUM_ITERS; i++) {
+            read(p12->p[0], &p12->buf, sizeof(p12->buf));
+            write(p23->p[1], &p12->buf, sizeof(p12->buf));
+            read(p32->p[0], &p32->buf, sizeof(p32->buf));
+            write(p21->p[1], &p32->buf, sizeof(p32->buf));
+        }
     }
-//    printf("Intermediate completed\n");
+    printf("Intermediate completed\n");
 //    printf("Verify I: %d\n", s23->buf);
     return 0;
 }
 
 static void *receiver(void *par) {
     params *p = (params *) par;
+    pipe_t *p12 = &p->pipe12;
     pipe_t *p23 = &p->pipe23;
     pipe_t *p32 = &p->pipe32;
+    pipe_t *p21 = &p->pipe21;
     printf("Receivers: %d %d %d %d \n", p23->p[0], p23->p[1], p32->p[0], p32->p[1]);
     int id = p->id;
-    pthread_barrier_wait(barrier);
-    for (int i = 0; i < NUM_ITERS; i++) {
-//        read(s23->sv[1], &s23->buf, sizeof(s23->buf));
-//        write(s23->sv[1], &s23->buf, sizeof(s23->buf));
-//        pthread_barrier_wait(barrier);
+    close(p12->p[0]);
+    close(p12->p[1]);
+    close(p21->p[0]);
+    close(p21->p[1]);
+    close(p23->p[1]);
+    close(p32->p[0]);
+
+    for(int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier);
+        for (int i = 0; i < NUM_ITERS; i++) {
+            read(p23->p[0], &p23->buf, sizeof(p23->buf));
+            write(p32->p[1], &p23->buf, sizeof(p23->buf));
+        }
     }
-//    printf("Receiver completed\n");
+    printf("Receiver completed\n");
 //    printf("Verify R: %d\n", s23->buf);
     return 0;
 }
