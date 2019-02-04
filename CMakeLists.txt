@@ -1,20 +1,16 @@
 cmake_minimum_required(VERSION 2.8)
-project(threads_exp C)
+project(threads_exp)
 
-set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_CXX_STANDARD 14)
 
-set(CMAKE_C_FLAGS "-std=gnu99 -g -Wall -O3 -D_GNU_SOURCE -DSHM -DLOCKTYPE=SPINLOCK")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -g -Wall -O3 -D_GNU_SOURCE")
 
-find_package( Threads REQUIRED )
+find_package(Boost REQUIRED)
 
-#add_executable(threads_exp main.c ArrayQueue.c ArrayQueue.h)
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
 
-#add_executable(threads_exp main.c CircularQueue.c CircularQueue.h utils.c utils.h)
-#add_executable(threads_exp utils.c utils.h benchmarks/posix_mutex.c benchmarks/posix_mutex.h)
-#add_executable(threads_exp utils.c utils.h benchmarks/pipe.c benchmarks/pipe.h)
-add_executable(threads_exp benchmarks/malloc.c benchmarks/malloc.h benchmarks/shm_malloc.h benchmarks/sockets.c benchmarks/sockets.h benchmarks/benchmark.c benchmarks/benchmark.h benchmarks/atomic.h)
-#add_executable(threads_exp utils.c utils.h benchmarks/futex.c benchmarks/futex.h)
-#add_executable(threads_exp utils.c utils.h benchmarks/futex_local.c benchmarks/futex.h)
-#add_executable(threads_exp utils.c utils.h benchmarks/signal_kill.c benchmarks/signal_kill.h)
+add_executable(threads_exp CRTurnQueue.hpp main.cpp HazardPointers.hpp)
 
 target_link_libraries(threads_exp -lm -lpthread -lrt)
