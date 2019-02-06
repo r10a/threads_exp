@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <climits>
 #include <sys/wait.h>
-#include "CRTurnQueue.hpp"
+#include "MSQueue.hpp"
 
 #ifndef NUM_ITERS
 #define NUM_ITERS 1000000
@@ -14,7 +14,7 @@
 #define NUM_RUNS 3
 #endif
 
-#define NUM_THREAD 8
+#define NUM_THREAD 1
 
 #define size_lt unsigned long long
 #define SHM_G "GLOBAL"
@@ -84,12 +84,13 @@ int assign_thread_to_core(int core_id, pthread_t pthread) {
 
 typedef struct params {
     int id;
-    CRTurnQueue<size_lt> *q12;
-    CRTurnQueue<size_lt> *q23;
-    CRTurnQueue<size_lt> *q32;
-    CRTurnQueue<size_lt> *q21;
+    MSQueue<size_lt> *q12;
+    MSQueue<size_lt> *q23;
+    MSQueue<size_lt> *q32;
+    MSQueue<size_lt> *q21;
     size_lt buf;
 } params;
+
 
 void shm_cleanup() {
     shared_memory_object::remove(SHM_G);
@@ -201,30 +202,11 @@ void shm_cleanup() {
     } remover;
 }
 
-char* gen_random(char *s, const int len) {
-    static const char alphanum[] =
-            "0123456789"
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "abcdefghijklmnopqrstuvwxyz";
-
-    for (int i = 0; i < len; ++i) {
-        s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-    }
-
-    s[len] = 0;
-    return s;
-}
-
 int main() {
-
     shm_cleanup();
     size_t size = 50000000; // 50 MB
 
-    fixed_managed_shared_memory managed_shm(create_only, SHM_G, size, (void *) 0x1000000000L);
-    /*fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
-    fixed_managed_shared_memory shm2(create_only, SHM_Q2, size);
-    fixed_managed_shared_memory shm3(create_only, SHM_Q3, size);
-    fixed_managed_shared_memory shm4(create_only, SHM_Q4, size);*/
+    fixed_managed_shared_memory managed_shm(open_or_create, SHM_G, size, (void *) 0x1000000000L);
 
     barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
     pthread_barrierattr_t barattr;
@@ -232,14 +214,19 @@ int main() {
     pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 3);
     pthread_barrierattr_destroy(&barattr);
 
-    /*CRTurnQueue<size_lt> *q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm1,
-                                                                                                NUM_THREAD * 2);
-    CRTurnQueue<size_lt> *q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm2,
-                                                                                                NUM_THREAD * 2);
-    CRTurnQueue<size_lt> *q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm3,
-                                                                                                NUM_THREAD * 2);
-    CRTurnQueue<size_lt> *q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm4,
-                                                                                                NUM_THREAD * 2);
+    /*fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
+    fixed_managed_shared_memory shm2(create_only, SHM_Q2, size);
+    fixed_managed_shared_memory shm3(create_only, SHM_Q3, size);
+    fixed_managed_shared_memory shm4(create_only, SHM_Q4, size);
+
+    MSQueue<size_lt> *q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm1,
+                                                                                        NUM_THREAD * 2);
+    MSQueue<size_lt> *q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm2,
+                                                                                        NUM_THREAD * 2);
+    MSQueue<size_lt> *q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm3,
+                                                                                        NUM_THREAD * 2);
+    MSQueue<size_lt> *q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm4,
+                                                                                        NUM_THREAD * 2);
     params p[NUM_THREAD];
     for (int i = 0; i < NUM_THREAD; i++) {
         p[i].id = i;
@@ -247,7 +234,8 @@ int main() {
         p[i].q23 = q23;
         p[i].q32 = q32;
         p[i].q21 = q21;
-    }*/
+    }
+*/
     fixed_managed_shared_memory shm1(open_or_create, SHM_Q1, size);
     fixed_managed_shared_memory shm2(open_or_create, SHM_Q2, size);
     fixed_managed_shared_memory shm3(open_or_create, SHM_Q3, size);
@@ -281,84 +269,65 @@ int main() {
     fixed_managed_shared_memory shm31(open_or_create, SHM_Q31, size);
     fixed_managed_shared_memory shm32(open_or_create, SHM_Q32, size);
 
-
-
-    /*CRTurnQueue<size_lt> *q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)[NUM_THREAD](&shm1, 2);
-    CRTurnQueue<size_lt> *q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)[NUM_THREAD](&shm2, 2);
-    CRTurnQueue<size_lt> *q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)[NUM_THREAD](&shm3, 2);
-    CRTurnQueue<size_lt> *q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)[NUM_THREAD](&shm4, 2);*/
     params p[8];
     p[0].id = 0;
-    p[0].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm1, 2);
-    p[0].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm2, 2);
-    p[0].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm3, 2);
-    p[0].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm4, 2);
+    p[0].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm1, 2);
+    p[0].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm2, 2);
+    p[0].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm3, 2);
+    p[0].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm4, 2);
     p[0].buf = 0;
 
     p[1].id = 1;
-    p[1].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm5, 2);
-    p[1].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm6, 2);
-    p[1].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm7, 2);
-    p[1].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm8, 2);
+    p[1].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm5, 2);
+    p[1].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm6, 2);
+    p[1].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm7, 2);
+    p[1].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm8, 2);
     p[1].buf = 0;
 
     p[2].id = 2;
-    p[2].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm9, 2);
-    p[2].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm10, 2);
-    p[2].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm11, 2);
-    p[2].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm12, 2);
+    p[2].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm9, 2);
+    p[2].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm10, 2);
+    p[2].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm11, 2);
+    p[2].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm12, 2);
     p[2].buf = 0;
 
     p[3].id = 3;
-    p[3].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm13, 2);
-    p[3].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm14, 2);
-    p[3].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm15, 2);
-    p[3].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm16, 2);
+    p[3].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm13, 2);
+    p[3].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm14, 2);
+    p[3].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm15, 2);
+    p[3].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm16, 2);
     p[3].buf = 0;
 
     p[4].id = 4;
-    p[4].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm17, 2);
-    p[4].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm18, 2);
-    p[4].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm19, 2);
-    p[4].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm20, 2);
+    p[4].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm17, 2);
+    p[4].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm18, 2);
+    p[4].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm19, 2);
+    p[4].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm20, 2);
     p[4].buf = 0;
 
     p[5].id = 5;
-    p[5].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm21, 2);
-    p[5].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm22, 2);
-    p[5].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm23, 2);
-    p[5].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm24, 2);
+    p[5].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm21, 2);
+    p[5].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm22, 2);
+    p[5].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm23, 2);
+    p[5].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm24, 2);
     p[5].buf = 0;
 
     p[6].id = 6;
-    p[6].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm25, 2);
-    p[6].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm26, 2);
-    p[6].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm27, 2);
-    p[6].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm28, 2);
+    p[6].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm25, 2);
+    p[6].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm26, 2);
+    p[6].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm27, 2);
+    p[6].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm28, 2);
     p[6].buf = 0;
 
     p[7].id = 7;
-    p[7].q12 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm29, 2);
-    p[7].q23 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm30, 2);
-    p[7].q32 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm31, 2);
-    p[7].q21 = managed_shm.construct<CRTurnQueue<size_lt>>(anonymous_instance)(&shm32, 2);
+    p[7].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm29, 2);
+    p[7].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm30, 2);
+    p[7].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm31, 2);
+    p[7].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm32, 2);
     p[7].buf = 0;
-
-
-
-    /*
-     * params p[NUM_THREAD];
-     * for (int i = 0; i < NUM_THREAD; i++) {
-        p[i].id = i;
-        p[i].q12 = &q12[i];
-        p[i].q23 = &q23[i];
-        p[i].q32 = &q32[i];
-        p[i].q21 = &q21[i];
-    }*/
 
     reqs = managed_shm.construct<size_lt>(anonymous_instance)[NUM_ITERS]();
     for (int i = 0; i < NUM_ITERS; i++) reqs[i] = i;
-
 
     if (fork() == 0) {
         pthread_t s_threads[NUM_THREAD];
@@ -408,16 +377,17 @@ int main() {
         exit(0);
     }
 
+
     int status;
     while (wait(&status) > 0) std::cout << "Process Exit status: " << status << std::endl;
 }
 
+
 static void *sender(void *par) {
     auto *p = (params *) par;
-    CRTurnQueue<size_lt> *q12 = p->q12;
-    CRTurnQueue<size_lt> *q21 = p->q21;
-//    int id = p->id;
-    int id = 0;
+    MSQueue<size_lt> *q12 = p->q12;
+    MSQueue<size_lt> *q21 = p->q21;
+    int id = p->id;
     size_lt start[NUM_RUNS];
     size_lt end[NUM_RUNS];
     size_lt delay[NUM_RUNS];
@@ -458,12 +428,11 @@ static void *sender(void *par) {
 
 static void *intermediate(void *par) {
     auto *p = (params *) par;
-    CRTurnQueue<size_lt> *q12 = p->q12;
-    CRTurnQueue<size_lt> *q23 = p->q23;
-    CRTurnQueue<size_lt> *q32 = p->q32;
-    CRTurnQueue<size_lt> *q21 = p->q21;
-//    int id = p->id + NUM_THREAD;
-    int id = 1;
+    MSQueue<size_lt> *q12 = p->q12;
+    MSQueue<size_lt> *q23 = p->q23;
+    MSQueue<size_lt> *q32 = p->q32;
+    MSQueue<size_lt> *q21 = p->q21;
+    int id = p->id + NUM_THREAD;
     size_lt *res;
     for (int j = 0; j < NUM_RUNS; j++) {
         pthread_barrier_wait(barrier_t);
@@ -481,10 +450,9 @@ static void *intermediate(void *par) {
 
 static void *receiver(void *par) {
     auto *p = (params *) par;
-    CRTurnQueue<size_lt> *q23 = p->q23;
-    CRTurnQueue<size_lt> *q32 = p->q32;
-//    int id = p->id;
-    int id = 0;
+    MSQueue<size_lt> *q23 = p->q23;
+    MSQueue<size_lt> *q32 = p->q32;
+    int id = p->id;
     size_lt *res;
     for (int j = 0; j < NUM_RUNS; j++) {
         pthread_barrier_wait(barrier_t);
