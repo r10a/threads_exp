@@ -211,7 +211,7 @@ int main() {
     barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
-    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 2);
+    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 3);
     pthread_barrierattr_destroy(&barattr);
 
     fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
