@@ -14,7 +14,7 @@
 #define NUM_RUNS 3
 #endif
 
-#define NUM_THREAD 1
+#define NUM_THREAD 8
 
 #define size_lt unsigned long long
 #define SHM_G "GLOBAL"
@@ -211,10 +211,10 @@ int main() {
     barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
-    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 3);
+    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 2);
     pthread_barrierattr_destroy(&barattr);
 
-    /*fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
+    fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
     fixed_managed_shared_memory shm2(create_only, SHM_Q2, size);
     fixed_managed_shared_memory shm3(create_only, SHM_Q3, size);
     fixed_managed_shared_memory shm4(create_only, SHM_Q4, size);
@@ -235,7 +235,7 @@ int main() {
         p[i].q32 = q32;
         p[i].q21 = q21;
     }
-*/
+/*
     fixed_managed_shared_memory shm1(open_or_create, SHM_Q1, size);
     fixed_managed_shared_memory shm2(open_or_create, SHM_Q2, size);
     fixed_managed_shared_memory shm3(open_or_create, SHM_Q3, size);
@@ -324,7 +324,7 @@ int main() {
     p[7].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm30, 2);
     p[7].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm31, 2);
     p[7].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm32, 2);
-    p[7].buf = 0;
+    p[7].buf = 0;*/
 
     reqs = managed_shm.construct<size_lt>(anonymous_instance)[NUM_ITERS]();
     for (int i = 0; i < NUM_ITERS; i++) reqs[i] = i;
