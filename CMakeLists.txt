@@ -11,6 +11,6 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
-add_executable(threads_exp CRTurnQueue.hpp main.cpp HazardPointers.hpp)
+add_executable(threads_exp main.cpp HazardPointers.hpp LCRQueue.hpp)
 
 target_link_libraries(threads_exp -lm -lpthread -lrt)
