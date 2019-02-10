@@ -14,7 +14,7 @@
 #define NUM_RUNS 3
 #endif
 
-#define NUM_THREAD 12
+#define NUM_THREAD 8
 
 #define size_lt unsigned long long
 #define SHM_G "GLOBAL"
@@ -97,7 +97,7 @@ int main() {
     barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
-    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 2);
+    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 3);
     pthread_barrierattr_destroy(&barattr);
 
     fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
@@ -160,7 +160,7 @@ int main() {
         exit(0);
     }
 
-    /*if (fork() == 0) {
+    if (fork() == 0) {
         pthread_t r_threads[NUM_THREAD];
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_create(&r_threads[i], nullptr, receiver, &p[i]);
@@ -171,7 +171,7 @@ int main() {
         }
         printf("Process 3 completed\n");
         exit(0);
-    }*/
+    }
 
     int status;
     while (wait(&status) > 0) std::cout << "Process Exit status: " << status << std::endl;
@@ -204,7 +204,7 @@ static void *sender(void *par) {
         size_lt timer_overhead = start[j] - delay[j];
         time[j] = end[j] - start[j] - timer_overhead;
         printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j],
-               ((double) time[j]) / NUM_ITERS / 2 , id);
+               ((double) time[j]) / NUM_ITERS , id);
 //        printf("Verify S: %llu\n", *res);
     }
     size_lt avg = 0;
@@ -212,7 +212,7 @@ static void *sender(void *par) {
         avg += llround(((double) j) / NUM_ITERS);
     }
     printf("Sender completed\n");
-    p->buf = llround(((double) avg) / NUM_RUNS / 2);
+    p->buf = llround(((double) avg) / NUM_RUNS);
     return 0;
 }
 
@@ -228,8 +228,8 @@ static void *intermediate(void *par) {
         pthread_barrier_wait(barrier_t);
         for (int i = 0; i < NUM_ITERS; i++) {
             while ((res = q12->dequeue(id)) == nullptr);
-//            q23->enqueue(res, id);
-//            while ((res = q32->dequeue(id)) == nullptr);
+            q23->enqueue(res, id);
+            while ((res = q32->dequeue(id)) == nullptr);
             q21->enqueue(res, id);
         }
     }
