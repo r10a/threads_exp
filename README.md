@@ -4,6 +4,7 @@ Simulation of three process roundtrip scenario using [RTE_RING](https://dpdk.rea
 
 RTE_Ring is a non-blocking queue part of Intel's Data Plane Development Kit ([DPDK](https://core.dpdk.org/doc/))
 
+DPDK requires all programs to be run in superuser mode. Also ensure [huge-pages](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/performance_tuning_guide/s-memory-transhuge) are allocated before execution.
 ### Build instructions
 Requires Boost and DPDK libraries installed.
 
@@ -13,7 +14,7 @@ Requires Boost and DPDK libraries installed.
 4. Build: `cmake . && make`
 
 ### Run instrution 
-Open 3 different terminals and run the following commands on each to start the benchmark
+Open 3 different terminals with _sudo_ access and run the following commands on each to start the benchmark
 - Terminal 1: `./main -l <core-mask> -n 4`
 - Terminal 2: `./main -l <core-mask> -n 4 --proc-type=secondary`
 - Terminal 3: `./main -l <core-mask> -n 4 --proc-type=secondary last`
