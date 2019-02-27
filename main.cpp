@@ -22,37 +22,6 @@
 #define SHM_Q2 "NODE_POOL_2"
 #define SHM_Q3 "NODE_POOL_3"
 #define SHM_Q4 "NODE_POOL_4"
-#define SHM_Q5 "NODE_POOL_6"
-#define SHM_Q6 "NODE_POOL_6"
-#define SHM_Q7 "NODE_POOL_7"
-#define SHM_Q8 "NODE_POOL_8"
-
-#define SHM_Q9 "NODE_POOL_9"
-#define SHM_Q10 "NODE_POOL_10"
-#define SHM_Q11 "NODE_POOL_11"
-#define SHM_Q12 "NODE_POOL_12"
-#define SHM_Q13 "NODE_POOL_13"
-#define SHM_Q14 "NODE_POOL_14"
-#define SHM_Q15 "NODE_POOL_15"
-#define SHM_Q16 "NODE_POOL_16"
-
-#define SHM_Q17 "NODE_POOL_17"
-#define SHM_Q18 "NODE_POOL_18"
-#define SHM_Q19 "NODE_POOL_19"
-#define SHM_Q20 "NODE_POOL_20"
-#define SHM_Q21 "NODE_POOL_21"
-#define SHM_Q22 "NODE_POOL_22"
-#define SHM_Q23 "NODE_POOL_23"
-#define SHM_Q24 "NODE_POOL_24"
-
-#define SHM_Q25 "NODE_POOL_25"
-#define SHM_Q26 "NODE_POOL_26"
-#define SHM_Q27 "NODE_POOL_27"
-#define SHM_Q28 "NODE_POOL_28"
-#define SHM_Q29 "NODE_POOL_29"
-#define SHM_Q30 "NODE_POOL_30"
-#define SHM_Q31 "NODE_POOL_31"
-#define SHM_Q32 "NODE_POOL_32"
 
 
 pthread_barrier_t *barrier_t;
@@ -98,34 +67,6 @@ void shm_cleanup() {
     shared_memory_object::remove(SHM_Q2);
     shared_memory_object::remove(SHM_Q3);
     shared_memory_object::remove(SHM_Q4);
-    shared_memory_object::remove(SHM_Q5);
-    shared_memory_object::remove(SHM_Q6);
-    shared_memory_object::remove(SHM_Q7);
-    shared_memory_object::remove(SHM_Q8);
-    shared_memory_object::remove(SHM_Q9);
-    shared_memory_object::remove(SHM_Q10);
-    shared_memory_object::remove(SHM_Q11);
-    shared_memory_object::remove(SHM_Q12);
-    shared_memory_object::remove(SHM_Q13);
-    shared_memory_object::remove(SHM_Q14);
-    shared_memory_object::remove(SHM_Q15);
-    shared_memory_object::remove(SHM_Q16);
-    shared_memory_object::remove(SHM_Q17);
-    shared_memory_object::remove(SHM_Q18);
-    shared_memory_object::remove(SHM_Q19);
-    shared_memory_object::remove(SHM_Q20);
-    shared_memory_object::remove(SHM_Q21);
-    shared_memory_object::remove(SHM_Q22);
-    shared_memory_object::remove(SHM_Q23);
-    shared_memory_object::remove(SHM_Q24);
-    shared_memory_object::remove(SHM_Q25);
-    shared_memory_object::remove(SHM_Q26);
-    shared_memory_object::remove(SHM_Q27);
-    shared_memory_object::remove(SHM_Q28);
-    shared_memory_object::remove(SHM_Q29);
-    shared_memory_object::remove(SHM_Q30);
-    shared_memory_object::remove(SHM_Q31);
-    shared_memory_object::remove(SHM_Q32);
 
     struct shm_remove {
         shm_remove() {
@@ -134,34 +75,6 @@ void shm_cleanup() {
             shared_memory_object::remove(SHM_Q2);
             shared_memory_object::remove(SHM_Q3);
             shared_memory_object::remove(SHM_Q4);
-            shared_memory_object::remove(SHM_Q5);
-            shared_memory_object::remove(SHM_Q6);
-            shared_memory_object::remove(SHM_Q7);
-            shared_memory_object::remove(SHM_Q8);
-            shared_memory_object::remove(SHM_Q9);
-            shared_memory_object::remove(SHM_Q10);
-            shared_memory_object::remove(SHM_Q11);
-            shared_memory_object::remove(SHM_Q12);
-            shared_memory_object::remove(SHM_Q13);
-            shared_memory_object::remove(SHM_Q14);
-            shared_memory_object::remove(SHM_Q15);
-            shared_memory_object::remove(SHM_Q16);
-            shared_memory_object::remove(SHM_Q17);
-            shared_memory_object::remove(SHM_Q18);
-            shared_memory_object::remove(SHM_Q19);
-            shared_memory_object::remove(SHM_Q20);
-            shared_memory_object::remove(SHM_Q21);
-            shared_memory_object::remove(SHM_Q22);
-            shared_memory_object::remove(SHM_Q23);
-            shared_memory_object::remove(SHM_Q24);
-            shared_memory_object::remove(SHM_Q25);
-            shared_memory_object::remove(SHM_Q26);
-            shared_memory_object::remove(SHM_Q27);
-            shared_memory_object::remove(SHM_Q28);
-            shared_memory_object::remove(SHM_Q29);
-            shared_memory_object::remove(SHM_Q30);
-            shared_memory_object::remove(SHM_Q31);
-            shared_memory_object::remove(SHM_Q32);
         }
 
         ~shm_remove() {
@@ -170,34 +83,6 @@ void shm_cleanup() {
             shared_memory_object::remove(SHM_Q2);
             shared_memory_object::remove(SHM_Q3);
             shared_memory_object::remove(SHM_Q4);
-            shared_memory_object::remove(SHM_Q5);
-            shared_memory_object::remove(SHM_Q6);
-            shared_memory_object::remove(SHM_Q7);
-            shared_memory_object::remove(SHM_Q8);
-            shared_memory_object::remove(SHM_Q9);
-            shared_memory_object::remove(SHM_Q10);
-            shared_memory_object::remove(SHM_Q11);
-            shared_memory_object::remove(SHM_Q12);
-            shared_memory_object::remove(SHM_Q13);
-            shared_memory_object::remove(SHM_Q14);
-            shared_memory_object::remove(SHM_Q15);
-            shared_memory_object::remove(SHM_Q16);
-            shared_memory_object::remove(SHM_Q17);
-            shared_memory_object::remove(SHM_Q18);
-            shared_memory_object::remove(SHM_Q19);
-            shared_memory_object::remove(SHM_Q20);
-            shared_memory_object::remove(SHM_Q21);
-            shared_memory_object::remove(SHM_Q22);
-            shared_memory_object::remove(SHM_Q23);
-            shared_memory_object::remove(SHM_Q24);
-            shared_memory_object::remove(SHM_Q25);
-            shared_memory_object::remove(SHM_Q26);
-            shared_memory_object::remove(SHM_Q27);
-            shared_memory_object::remove(SHM_Q28);
-            shared_memory_object::remove(SHM_Q29);
-            shared_memory_object::remove(SHM_Q30);
-            shared_memory_object::remove(SHM_Q31);
-            shared_memory_object::remove(SHM_Q32);
         }
     } remover;
 }
@@ -235,96 +120,6 @@ int main() {
         p[i].q32 = q32;
         p[i].q21 = q21;
     }
-/*
-    fixed_managed_shared_memory shm1(open_or_create, SHM_Q1, size);
-    fixed_managed_shared_memory shm2(open_or_create, SHM_Q2, size);
-    fixed_managed_shared_memory shm3(open_or_create, SHM_Q3, size);
-    fixed_managed_shared_memory shm4(open_or_create, SHM_Q4, size);
-    fixed_managed_shared_memory shm5(open_or_create, SHM_Q5, size);
-    fixed_managed_shared_memory shm6(open_or_create, SHM_Q6, size);
-    fixed_managed_shared_memory shm7(open_or_create, SHM_Q7, size);
-    fixed_managed_shared_memory shm8(open_or_create, SHM_Q8, size);
-    fixed_managed_shared_memory shm9(open_or_create, SHM_Q9, size);
-    fixed_managed_shared_memory shm10(open_or_create, SHM_Q10, size);
-    fixed_managed_shared_memory shm11(open_or_create, SHM_Q11, size);
-    fixed_managed_shared_memory shm12(open_or_create, SHM_Q12, size);
-    fixed_managed_shared_memory shm13(open_or_create, SHM_Q13, size);
-    fixed_managed_shared_memory shm14(open_or_create, SHM_Q14, size);
-    fixed_managed_shared_memory shm15(open_or_create, SHM_Q15, size);
-    fixed_managed_shared_memory shm16(open_or_create, SHM_Q16, size);
-    fixed_managed_shared_memory shm17(open_or_create, SHM_Q17, size);
-    fixed_managed_shared_memory shm18(open_or_create, SHM_Q18, size);
-    fixed_managed_shared_memory shm19(open_or_create, SHM_Q19, size);
-    fixed_managed_shared_memory shm20(open_or_create, SHM_Q20, size);
-    fixed_managed_shared_memory shm21(open_or_create, SHM_Q21, size);
-    fixed_managed_shared_memory shm22(open_or_create, SHM_Q22, size);
-    fixed_managed_shared_memory shm23(open_or_create, SHM_Q23, size);
-    fixed_managed_shared_memory shm24(open_or_create, SHM_Q24, size);
-    fixed_managed_shared_memory shm25(open_or_create, SHM_Q25, size);
-    fixed_managed_shared_memory shm26(open_or_create, SHM_Q26, size);
-    fixed_managed_shared_memory shm27(open_or_create, SHM_Q27, size);
-    fixed_managed_shared_memory shm28(open_or_create, SHM_Q28, size);
-    fixed_managed_shared_memory shm29(open_or_create, SHM_Q29, size);
-    fixed_managed_shared_memory shm30(open_or_create, SHM_Q30, size);
-    fixed_managed_shared_memory shm31(open_or_create, SHM_Q31, size);
-    fixed_managed_shared_memory shm32(open_or_create, SHM_Q32, size);
-
-    params p[8];
-    p[0].id = 0;
-    p[0].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm1, 2);
-    p[0].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm2, 2);
-    p[0].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm3, 2);
-    p[0].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm4, 2);
-    p[0].buf = 0;
-
-    p[1].id = 1;
-    p[1].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm5, 2);
-    p[1].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm6, 2);
-    p[1].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm7, 2);
-    p[1].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm8, 2);
-    p[1].buf = 0;
-
-    p[2].id = 2;
-    p[2].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm9, 2);
-    p[2].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm10, 2);
-    p[2].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm11, 2);
-    p[2].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm12, 2);
-    p[2].buf = 0;
-
-    p[3].id = 3;
-    p[3].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm13, 2);
-    p[3].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm14, 2);
-    p[3].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm15, 2);
-    p[3].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm16, 2);
-    p[3].buf = 0;
-
-    p[4].id = 4;
-    p[4].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm17, 2);
-    p[4].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm18, 2);
-    p[4].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm19, 2);
-    p[4].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm20, 2);
-    p[4].buf = 0;
-
-    p[5].id = 5;
-    p[5].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm21, 2);
-    p[5].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm22, 2);
-    p[5].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm23, 2);
-    p[5].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm24, 2);
-    p[5].buf = 0;
-
-    p[6].id = 6;
-    p[6].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm25, 2);
-    p[6].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm26, 2);
-    p[6].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm27, 2);
-    p[6].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm28, 2);
-    p[6].buf = 0;
-
-    p[7].id = 7;
-    p[7].q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm29, 2);
-    p[7].q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm30, 2);
-    p[7].q32 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm31, 2);
-    p[7].q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm32, 2);
-    p[7].buf = 0;*/
 
     reqs = managed_shm.construct<size_lt>(anonymous_instance)[NUM_ITERS]();
     for (int i = 0; i < NUM_ITERS; i++) reqs[i] = i;
