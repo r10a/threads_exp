@@ -1,6 +1,7 @@
 ## Michael-Scott lock-free queue benchmark
 
 Simulation of three process roundtrip scenario using [MSQueue](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf).
+![round-trip scenario](/pictures/scenario-roundtrip.png)
 
 Queue implementation modified for shared memory using [Boost](https://www.boost.org/doc/libs/1_63_0/doc/html/interprocess.html) library.
 
