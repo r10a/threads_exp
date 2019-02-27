@@ -51,7 +51,7 @@ static inline size_lt elapsed_time_ns(size_lt ns) {
 }
 
 static int
-lcore_primary(__attribute__((unused)) void *arg) {
+lcore_primary(__attribute__((unused)) void *arg) { // Process 1 thread function
     unsigned lcore_id = rte_lcore_id();
 
     printf("Starting core %u on master\n", lcore_id);
@@ -59,7 +59,7 @@ lcore_primary(__attribute__((unused)) void *arg) {
     void *recv = nullptr;
     int ret = 0;
 
-    while ((ret = rte_ring_dequeue(recv_ring, &recv)) < 0);
+    while ((ret = rte_ring_dequeue(recv_ring, &recv)) < 0); // wait for Process 2 to initialize
 
     printf("Received %s with status: %d on core: %d\n", (char *) recv, ret, lcore_id);
     rte_mempool_put(message_pool, recv);
@@ -77,9 +77,8 @@ lcore_primary(__attribute__((unused)) void *arg) {
         start[j] = elapsed_time_ns(0);
         for (int i = 0; i < NUM_ITERS; i++) {
             snprintf((char *) msg, STR_TOKEN_SIZE, "%d", i);
-            rte_ring_enqueue(send_ring, msg);
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-//            printf("core %u: Received '%s' %d\n", lcore_id, (char *) recv, patience);
+            rte_ring_enqueue(send_ring, msg); // Process 1 -> Process 2
+            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/); // Process 2 -> Process 1
         }
         end[j] = elapsed_time_ns(0);
         size_lt timer_overhead = start[j] - delay[j];
@@ -96,10 +95,10 @@ lcore_primary(__attribute__((unused)) void *arg) {
     }
     printf("Thread %d average: %llu\n", lcore_id, llround(((double) avg) / NUM_RUNS / 2));
     return 0;
-}
+} // end Process 1 thread function
 
 static int
-lcore_intermediate(__attribute__((unused)) void *arg) {
+lcore_intermediate(__attribute__((unused)) void *arg) { // Process 2 thread function
     unsigned lcore_id = rte_lcore_id();
 
     printf("Starting core %u on intermediate\n", lcore_id);
@@ -110,32 +109,32 @@ lcore_intermediate(__attribute__((unused)) void *arg) {
     if (rte_mempool_get(message_pool, &msg) < 0)
         rte_panic("Failed to get message buffer\n");
 
-    while ((ret = rte_ring_dequeue(recv_ring1, &start)) < 0);
+    while ((ret = rte_ring_dequeue(recv_ring1, &start)) < 0); // wait for Process 3 to initlizae
     printf("Received %s with status: %d on core: %d\n", (char *) start, ret, lcore_id);
     rte_mempool_put(message_pool, start);
 
     snprintf((char *) msg, STR_TOKEN_SIZE, "%s", "starting");
-    ret = rte_ring_enqueue(send_ring, msg);
+    ret = rte_ring_enqueue(send_ring, msg); // Send message to process 1 that Process 2 is initialized
     printf("Sent %s with status: %d on core: %d\n", (char *) msg, ret, lcore_id);
 
     for (int j = 0; j < NUM_RUNS; j++) {
         for (int i = 0; i < NUM_ITERS; i++) {
             void *recv = nullptr;
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-            rte_ring_enqueue(send_ring1, recv);
+            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/); // Process 1 -> Process 2
+            rte_ring_enqueue(send_ring1, recv); // Process 2 -> Process 3
             void* recv1 = nullptr;
-            while (rte_ring_dequeue(recv_ring1, &recv1) < 0 /*&& patience++ < PATIENCE*/);
-            rte_ring_enqueue(send_ring, recv1);
+            while (rte_ring_dequeue(recv_ring1, &recv1) < 0 /*&& patience++ < PATIENCE*/); // Process 3 -> Process 2
+            rte_ring_enqueue(send_ring, recv1); // Process 2 -> Process 1
         }
     }
 
 //    rte_mempool_put(message_pool, recv);
     printf("Finished %u on intermediate\n", lcore_id);
     return 0;
-}
+} // end Process 2 thread function
 
 static int
-lcore_last(__attribute__((unused)) void *arg) {
+lcore_last(__attribute__((unused)) void *arg) { // Process 3 thread function
     unsigned lcore_id = rte_lcore_id();
 
     printf("Starting core %u on last\n", lcore_id);
@@ -146,22 +145,21 @@ lcore_last(__attribute__((unused)) void *arg) {
         rte_panic("Failed to get message buffer\n");
 
     snprintf((char *) msg, STR_TOKEN_SIZE, "%s", "starting");
-    ret = rte_ring_enqueue(send_ring, msg);
+    ret = rte_ring_enqueue(send_ring, msg); // send message to Process 2 that Process 3 is initialized
     printf("Sent %s with status: %d on core: %d\n", (char *) msg, ret, lcore_id);
 
     for (int j = 0; j < NUM_RUNS; j++) {
         for (int i = 0; i < NUM_ITERS; i++) {
             void *recv = nullptr;
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-//            printf("core %u: Received '%s' %d\n", lcore_id, (char *) recv, patience);
-            rte_ring_enqueue(send_ring, recv);
+            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/); // Process 2 -> Process 3
+            rte_ring_enqueue(send_ring, recv); // Process 3 -> Process 2
         }
     }
 
 //    rte_mempool_put(message_pool, recv);
     printf("Finished %u on last\n", lcore_id);
     return 0;
-}
+} // end Process 3 thread function
 
 int main(int argc, char **argv) {
     const unsigned flags = 0;
@@ -179,11 +177,11 @@ int main(int argc, char **argv) {
      * Roundtrip: Primary > Intermediate > Last > Intermediate > Primary
      */
 
-    if (argc == 5) { // Primary Process
+    if (argc == 5) { // Process 1 == Primary process
         ret = rte_eal_init(argc, argv);
-    } else if (argc == 7) { // Last Process
+    } else if (argc == 7) { // Process 3 == Last Process
         ret = rte_eal_init(6, argv);
-    } else { // Intermediate process
+    } else { // Process 2 == Intermediate process
         intermediate = true;
         ret = rte_eal_init(6, argv);
     }
@@ -191,7 +189,7 @@ int main(int argc, char **argv) {
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "Cannot init EAL\n");
 
-    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+    if (rte_eal_process_type() == RTE_PROC_PRIMARY) { // Process 1
         send_ring = rte_ring_create(_PRI_2_INTE, ring_size, rte_socket_id(), flags);
         send_ring1 = rte_ring_create(_INTE_2_LAST, ring_size, rte_socket_id(), flags);
         recv_ring1 = rte_ring_create(_LAST_2_INTE, ring_size, rte_socket_id(), flags);
@@ -202,12 +200,12 @@ int main(int argc, char **argv) {
                                           nullptr, nullptr, nullptr, nullptr,
                                           rte_socket_id(), flags);
     } else {
-        if (intermediate) {
+        if (intermediate) { // Process 2
             recv_ring = rte_ring_lookup(_PRI_2_INTE);
             send_ring1 = rte_ring_lookup(_INTE_2_LAST);
             recv_ring1 = rte_ring_lookup(_LAST_2_INTE);
             send_ring = rte_ring_lookup(_INTE_2_PRI);
-        } else {
+        } else { // Process 3
             recv_ring = rte_ring_lookup(_INTE_2_LAST);
             send_ring = rte_ring_lookup(_LAST_2_INTE);
             send_ring1 = send_ring;
@@ -224,22 +222,25 @@ int main(int argc, char **argv) {
 
     RTE_LOG(INFO, APP, "Finished Process Init.\n");
 
-    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+    if (rte_eal_process_type() == RTE_PROC_PRIMARY) { // Process 1
         RTE_LCORE_FOREACH_SLAVE(lcore_id) {
             rte_eal_remote_launch(lcore_primary, nullptr, lcore_id);
         }
+        // end Process 1
     } else {
-        if (intermediate) {
+        if (intermediate) { // Process 2
             RTE_LCORE_FOREACH_SLAVE(lcore_id) {
                 rte_eal_remote_launch(lcore_intermediate, nullptr, lcore_id);
             }
-        } else {
+            // end Process 2
+        } else { // Process 3
             RTE_LCORE_FOREACH_SLAVE(lcore_id) {
                 rte_eal_remote_launch(lcore_last, nullptr, lcore_id);
             }
+            // end Process 3
         }
     }
 
-    rte_eal_mp_wait_lcore();
+    rte_eal_mp_wait_lcore(); // wait for all operations to finish
     return 0;
 }
