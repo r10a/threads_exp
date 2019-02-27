@@ -1,4 +1,4 @@
-## Multi-process shared memory producer-consumer queue implementations benchmarks
+## Interprocess multi-producer multi-consumer queue implementations benchmarks
 
 Relevent branches - 
 - [LCRQ](https://github.com/r10a/threads_exp/tree/LCRQueue)
