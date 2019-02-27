@@ -1,6 +1,7 @@
 ## DPDK RTE-Ring benchmark
 
 Simulation of three process roundtrip scenario using [RTE_RING](https://dpdk.readthedocs.io/en/v16.04/prog_guide/ring_lib.html).
+![round-trip scenario](/pictures/scenario-roundtrip.png)
 
 RTE_Ring is a non-blocking queue part of Intel's Data Plane Development Kit ([DPDK](https://core.dpdk.org/doc/))
 
