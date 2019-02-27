@@ -88,22 +88,27 @@ void shm_cleanup() {
 }
 
 int main() {
+    // shared memory cleanup
     shm_cleanup();
     size_t size = 50000000; // 50 MB
 
+    // create global shared memory pool
     fixed_managed_shared_memory managed_shm(open_or_create, SHM_G, size, (void *) 0x1000000000L);
 
+    // barrier init
     barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
     pthread_barrierattr_t barattr;
     pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
     pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 3);
     pthread_barrierattr_destroy(&barattr);
 
+    // create shared memory pool for each queue
     fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
     fixed_managed_shared_memory shm2(create_only, SHM_Q2, size);
     fixed_managed_shared_memory shm3(create_only, SHM_Q3, size);
     fixed_managed_shared_memory shm4(create_only, SHM_Q4, size);
 
+    // init queues
     MSQueue<size_lt> *q12 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm1,
                                                                                         NUM_THREAD * 2);
     MSQueue<size_lt> *q23 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm2,
@@ -112,6 +117,8 @@ int main() {
                                                                                         NUM_THREAD * 2);
     MSQueue<size_lt> *q21 = managed_shm.construct<MSQueue<size_lt>>(anonymous_instance)(&shm4,
                                                                                         NUM_THREAD * 2);
+
+    // init params
     params p[NUM_THREAD];
     for (int i = 0; i < NUM_THREAD; i++) {
         p[i].id = i;
@@ -121,14 +128,15 @@ int main() {
         p[i].q21 = q21;
     }
 
+    // init requests
     reqs = managed_shm.construct<size_lt>(anonymous_instance)[NUM_ITERS]();
     for (int i = 0; i < NUM_ITERS; i++) reqs[i] = i;
 
-    if (fork() == 0) {
+    if (fork() == 0) { // Process 1
         pthread_t s_threads[NUM_THREAD];
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_create(&s_threads[i], nullptr, sender, &p[i]);
-            assign_thread_to_core(i, s_threads[i]);
+            assign_thread_to_core(i, s_threads[i]); // pin thread to core
         }
 
         for (unsigned long s_thread : s_threads) {
@@ -143,13 +151,13 @@ int main() {
         printf("Avg time taken: %f ns | Max: %llu | Min: %llu\n", ((double) avg) / NUM_THREAD, max, min);
         printf("Process 1 completed\n");
         exit(0);
-    }
+    } // end Process 1
 
-    if (fork() == 0) {
+    if (fork() == 0) { // Process 2
         pthread_t i_threads[NUM_THREAD];
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_create(&i_threads[i], nullptr, intermediate, &p[i]);
-            assign_thread_to_core(i + NUM_THREAD, i_threads[i]);
+            assign_thread_to_core(i + NUM_THREAD, i_threads[i]); // pin thread to core
         }
 
         for (unsigned long i_thread : i_threads) {
@@ -157,28 +165,29 @@ int main() {
         }
         printf("Process 2 completed\n");
         exit(0);
-    }
+    } // end Process 2
 
-    if (fork() == 0) {
+    if (fork() == 0) { // Process 3
         pthread_t r_threads[NUM_THREAD];
         for (int i = 0; i < NUM_THREAD; i++) {
             pthread_create(&r_threads[i], nullptr, receiver, &p[i]);
-            assign_thread_to_core(i + NUM_THREAD * 2, r_threads[i]);
+            assign_thread_to_core(i + NUM_THREAD * 2, r_threads[i]); // pin thread to core
         }
         for (unsigned long r_thread : r_threads) {
             pthread_join(r_thread, nullptr);
         }
         printf("Process 3 completed\n");
         exit(0);
-    }
+    } // end Process 3
 
 
+    // wait for all processes to finish
     int status;
     while (wait(&status) > 0) std::cout << "Process Exit status: " << status << std::endl;
 }
 
 
-static void *sender(void *par) {
+static void *sender(void *par) { // Process 1 thread function
     auto *p = (params *) par;
     MSQueue<size_lt> *q12 = p->q12;
     MSQueue<size_lt> *q21 = p->q21;
@@ -189,20 +198,16 @@ static void *sender(void *par) {
     size_lt time[NUM_RUNS];
     size_lt *res;
 
-    /* for (int i = 0; i < 100; i++) {
-         q12->enqueue(&reqs[i], id);
-     }*/
-
     for (int j = 0; j < NUM_RUNS; j++) {
-        pthread_barrier_wait(barrier_t);
+        pthread_barrier_wait(barrier_t); // barrier to wait for all threads to initialize
 
         delay[j] = elapsed_time_ns(0);
-        start[j] = elapsed_time_ns(0);
+        start[j] = elapsed_time_ns(0); // start timer
         for (int i = 0; i < NUM_ITERS; i++) {
-            q12->enqueue(&reqs[i], id);
-            while ((res = q21->dequeue(id)) == nullptr);
+            q12->enqueue(&reqs[i], id); // Process 1 -> Process 2
+            while ((res = q21->dequeue(id)) == nullptr); // Process 2 -> Process 1
         }
-        end[j] = elapsed_time_ns(0);
+        end[j] = elapsed_time_ns(0); // end timer
         if (res != nullptr) printf("Verify S: %llu\n", *res);
         if (res == nullptr) printf("Verify is NULL");
 
@@ -219,9 +224,9 @@ static void *sender(void *par) {
     printf("Sender completed\n");
     p->buf = llround(((double) avg) / NUM_RUNS);
     return 0;
-}
+} // end Process 1 thread function
 
-static void *intermediate(void *par) {
+static void *intermediate(void *par) { // Process 2 thread function
     auto *p = (params *) par;
     MSQueue<size_lt> *q12 = p->q12;
     MSQueue<size_lt> *q23 = p->q23;
@@ -230,33 +235,33 @@ static void *intermediate(void *par) {
     int id = p->id + NUM_THREAD;
     size_lt *res;
     for (int j = 0; j < NUM_RUNS; j++) {
-        pthread_barrier_wait(barrier_t);
+        pthread_barrier_wait(barrier_t); // barrier to wait for all threads to initialize
         for (int i = 0; i < NUM_ITERS; i++) {
-            while ((res = q12->dequeue(id)) == nullptr);
-            q23->enqueue(res, id);
-            while ((res = q32->dequeue(id)) == nullptr);
-            q21->enqueue(res, id);
+            while ((res = q12->dequeue(id)) == nullptr); // Process 1 -> Process 2
+            q23->enqueue(res, id); // Process 2 -> Process 3
+            while ((res = q32->dequeue(id)) == nullptr); // Process 3 -> Process 2
+            q21->enqueue(res, id); // Process 2 -> Process 1
         }
     }
 //    printf("Verify: %llu\n", *res);
     printf("Intermediate completed\n");
     return 0;
-}
+} // end Process 2 thread function
 
-static void *receiver(void *par) {
+static void *receiver(void *par) { // Process 3 thread function
     auto *p = (params *) par;
     MSQueue<size_lt> *q23 = p->q23;
     MSQueue<size_lt> *q32 = p->q32;
     int id = p->id;
     size_lt *res;
     for (int j = 0; j < NUM_RUNS; j++) {
-        pthread_barrier_wait(barrier_t);
+        pthread_barrier_wait(barrier_t); // barrier to wait for all threads to initialize
         for (int i = 0; i < NUM_ITERS; i++) {
-            while ((res = q23->dequeue(id)) == nullptr);
-            q32->enqueue(res, id);
+            while ((res = q23->dequeue(id)) == nullptr); // Process 2 -> Process 3
+            q32->enqueue(res, id); // Process 3 -> Process 2
         }
     }
     printf("Receiver completed\n");
 //    printf("Verify R: %d\n", s23->buf);
     return 0;
-}
+} // end Process 3 thread function
