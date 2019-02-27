@@ -1,6 +1,7 @@
 ## LCRQ benchmark
 
 Simulation of three process roundtrip scenario using [LCRQ](http://www.cs.tau.ac.il/~mad/publications/ppopp2013-x86queues.pdf).
+![round-trip scenario](/pictures/scenario-roundtrip.png)
 
 Queue implementation modified for shared memory using [Boost](https://www.boost.org/doc/libs/1_63_0/doc/html/interprocess.html) library.
 
