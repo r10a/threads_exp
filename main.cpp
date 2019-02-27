@@ -1,48 +1,35 @@
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <stdarg.h>
-#include <errno.h>
-#include <unistd.h>
-#include <termios.h>
+#include <iterator>
 #include <algorithm>
-#include <sys/queue.h>
+#include <unistd.h>
+#include <climits>
+#include <sys/wait.h>
+#include "SCRQueue.hpp"
+#include "EventCount.hpp"
 
-#include <rte_common.h>
-#include <rte_memory.h>
-#include <rte_launch.h>
-#include <rte_eal.h>
-#include <rte_per_lcore.h>
-#include <rte_lcore.h>
-#include <rte_debug.h>
-#include <rte_atomic.h>
-#include <rte_branch_prediction.h>
-#include <rte_ring.h>
-#include <rte_log.h>
-#include <rte_mempool.h>
-#include <cmdline_rdline.h>
-#include <cmdline_parse.h>
-#include <cmdline_parse_string.h>
-#include <cmdline_socket.h>
-#include <cmdline.h>
-
-#define RTE_LOGTYPE_APP RTE_LOGTYPE_USER1
-
-static const char *_MSG_POOL = "MSG_POOL";
-static const char *_PRI_2_INTE = "PRI_2_INTE";
-static const char *_INTE_2_LAST = "INTE_2_LAST";
-static const char *_LAST_2_INTE = "LAST_2_INTE";
-static const char *_INTE_2_PRI = "INTE_2_PRI";
-
-struct rte_ring *send_ring, *recv_ring;
-struct rte_ring *send_ring1, *recv_ring1;
-struct rte_mempool *message_pool;
-
+#ifndef NUM_ITERS
 #define NUM_ITERS 1000000
-#define NUM_RUNS 5
+#endif
+
+#ifndef NUM_RUNS
+#define NUM_RUNS 3
+#endif
+
+#define NUM_THREAD 8
 #define size_lt unsigned long long
+#define SHM_G "GLOBAL"
+#define SHM_Q1 "NODE_POOL_1"
+#define SHM_Q2 "NODE_POOL_2"
+#define SHM_Q3 "NODE_POOL_3"
+#define SHM_Q4 "NODE_POOL_4"
+
+
+pthread_barrier_t *barrier_t;
+size_lt *reqs;
+
+static void *sender(void *params);
+
+static void *intermediate(void *params);
 
 static inline size_lt elapsed_time_ns(size_lt ns) {
     struct timespec t;
@@ -50,196 +37,165 @@ static inline size_lt elapsed_time_ns(size_lt ns) {
     return t.tv_sec * 1000000000L + t.tv_nsec - ns;
 }
 
-static int
-lcore_primary(__attribute__((unused)) void *arg) {
-    unsigned lcore_id = rte_lcore_id();
+int assign_thread_to_core(int core_id, pthread_t pthread) {
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    if (core_id < 0 || core_id >= num_cores)
+        return EINVAL;
 
-    printf("Starting core %u on master\n", lcore_id);
-    void *msg = nullptr;
-    void *recv = nullptr;
-    int ret = 0;
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
 
-    while ((ret = rte_ring_dequeue(recv_ring, &recv)) < 0);
+    return pthread_setaffinity_np(pthread, sizeof(cpu_set_t), &cpuset);
+}
 
-    printf("Received %s with status: %d on core: %d\n", (char *) recv, ret, lcore_id);
-    rte_mempool_put(message_pool, recv);
+typedef struct params {
+    int id;
+    SCRQueue<size_lt> *q12;
+    SCRQueue<size_lt> *q21;
+    size_lt buf;
+} params;
 
-    if (rte_mempool_get(message_pool, &msg) < 0)
-        rte_panic("Failed to get message buffer\n");
+void shm_cleanup() {
+    shared_memory_object::remove(SHM_G);
+    shared_memory_object::remove(SHM_Q1);
+    shared_memory_object::remove(SHM_Q2);
+    shared_memory_object::remove(SHM_Q3);
+    shared_memory_object::remove(SHM_Q4);
 
+    struct shm_remove {
+        shm_remove() {
+            shared_memory_object::remove(SHM_G);
+            shared_memory_object::remove(SHM_Q1);
+            shared_memory_object::remove(SHM_Q2);
+            shared_memory_object::remove(SHM_Q3);
+            shared_memory_object::remove(SHM_Q4);
+        }
+
+        ~shm_remove() {
+            shared_memory_object::remove(SHM_G);
+            shared_memory_object::remove(SHM_Q1);
+            shared_memory_object::remove(SHM_Q2);
+            shared_memory_object::remove(SHM_Q3);
+            shared_memory_object::remove(SHM_Q4);
+        }
+    } remover;
+}
+
+
+int main() {
+
+    shm_cleanup();
+    size_t size = 50000000; // 50 MB
+
+    fixed_managed_shared_memory managed_shm(create_only, SHM_G, size, (void *) 0x1000000000L);
+    fixed_managed_shared_memory shm1(create_only, SHM_Q1, size);
+    fixed_managed_shared_memory shm2(create_only, SHM_Q2, size);
+
+    barrier_t = managed_shm.construct<pthread_barrier_t>(anonymous_instance)();
+    pthread_barrierattr_t barattr;
+    pthread_barrierattr_setpshared(&barattr, PTHREAD_PROCESS_SHARED);
+    pthread_barrier_init(barrier_t, &barattr, NUM_THREAD * 2);
+    pthread_barrierattr_destroy(&barattr);
+
+    SCRQueue<size_lt> *q12 = managed_shm.construct<SCRQueue<size_lt>>(anonymous_instance)(&managed_shm, &shm1,
+                                                                                          NUM_THREAD);
+    SCRQueue<size_lt> *q21 = managed_shm.construct<SCRQueue<size_lt>>(anonymous_instance)(&managed_shm, &shm2,
+                                                                                          NUM_THREAD);
+
+    params p[NUM_THREAD];
+    for (int i = 0; i < NUM_THREAD; i++) {
+        p[i].id = i;
+        p[i].q12 = q12;
+        p[i].q21 = q21;
+    }
+    reqs = managed_shm.construct<size_lt>(anonymous_instance)[NUM_ITERS]();
+    for (size_lt i = 0; i < NUM_ITERS; i++) reqs[i] = i;
+
+    if (fork()) {
+        pthread_t s_threads[NUM_THREAD];
+        for (int i = 0; i < NUM_THREAD; i++) {
+            pthread_create(&s_threads[i], nullptr, sender, &p[i]);
+            assign_thread_to_core(i, s_threads[i]);
+        }
+
+        for (unsigned long s_thread : s_threads) {
+            pthread_join(s_thread, nullptr);
+        }
+
+        exit(0);
+    }
+
+    if (fork()) {
+        pthread_t i_threads[NUM_THREAD];
+        for (int i = 0; i < NUM_THREAD; i++) {
+            pthread_create(&i_threads[i], nullptr, intermediate, &p[i]);
+            assign_thread_to_core(i + NUM_THREAD, i_threads[i]);
+        }
+        for (unsigned long i_thread : i_threads) {
+            pthread_join(i_thread, nullptr);
+        }
+        exit(0);
+    }
+
+    int status;
+    while (wait(&status) < 0);
+}
+
+static void *sender(void *par) {
+    auto *p = (params *) par;
+    SCRQueue<size_lt> *q12 = p->q12;
+    SCRQueue<size_lt> *q21 = p->q21;
+    int id = p->id;
     size_lt start[NUM_RUNS];
     size_lt end[NUM_RUNS];
     size_lt delay[NUM_RUNS];
     size_lt time[NUM_RUNS];
+    size_lt *res;
 
     for (int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier_t);
+
         delay[j] = elapsed_time_ns(0);
         start[j] = elapsed_time_ns(0);
         for (int i = 0; i < NUM_ITERS; i++) {
-            snprintf((char *) msg, STR_TOKEN_SIZE, "%d", i);
-            rte_ring_enqueue(send_ring, msg);
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-//            printf("core %u: Received '%s' %d\n", lcore_id, (char *) recv, patience);
+            q12->enqueue(&reqs[i], id);
+            res = q21->spinDequeue(id);
+//            printf("Verify S: %llu id: %d\n", *res, id);
         }
         end[j] = elapsed_time_ns(0);
+        if (res != nullptr) printf("Verify S: %llu\n", *res);
+        if (res == nullptr) printf("Verify is NULL");
+
         size_lt timer_overhead = start[j] - delay[j];
         time[j] = end[j] - start[j] - timer_overhead;
         printf("Time taken for #%d: %llu ns | Per iter: %f ns | ID: %d\n", j, time[j],
-               ((double) time[j]) / NUM_ITERS / 2, lcore_id);
+               ((double) time[j]) / NUM_ITERS / 2, id);
+//        printf("Verify S: %llu\n", *res);
     }
-    rte_mempool_put(message_pool, msg);
-
-    printf("Finished %u on master\n", lcore_id);
     size_lt avg = 0;
     for (unsigned long long j : time) {
         avg += llround(((double) j) / NUM_ITERS);
     }
-    printf("Thread %d average: %llu\n", lcore_id, llround(((double) avg) / NUM_RUNS / 2));
+    printf("Sender completed\n");
+    p->buf = llround(((double) avg) / NUM_RUNS / 2);
     return 0;
 }
 
-static int
-lcore_intermediate(__attribute__((unused)) void *arg) {
-    unsigned lcore_id = rte_lcore_id();
-
-    printf("Starting core %u on intermediate\n", lcore_id);
-    void *msg = nullptr;
-    void *start = nullptr;
-    int ret = 0;
-
-    if (rte_mempool_get(message_pool, &msg) < 0)
-        rte_panic("Failed to get message buffer\n");
-
-    while ((ret = rte_ring_dequeue(recv_ring1, &start)) < 0);
-    printf("Received %s with status: %d on core: %d\n", (char *) start, ret, lcore_id);
-    rte_mempool_put(message_pool, start);
-
-    snprintf((char *) msg, STR_TOKEN_SIZE, "%s", "starting");
-    ret = rte_ring_enqueue(send_ring, msg);
-    printf("Sent %s with status: %d on core: %d\n", (char *) msg, ret, lcore_id);
-
+static void *intermediate(void *par) {
+    auto *p = (params *) par;
+    SCRQueue<size_lt> *q12 = p->q12;
+    SCRQueue<size_lt> *q21 = p->q21;
+    int id = p->id + NUM_THREAD;
+    size_lt *res;
     for (int j = 0; j < NUM_RUNS; j++) {
+        pthread_barrier_wait(barrier_t);
         for (int i = 0; i < NUM_ITERS; i++) {
-            void *recv = nullptr;
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-            rte_ring_enqueue(send_ring1, recv);
-            void* recv1 = nullptr;
-            while (rte_ring_dequeue(recv_ring1, &recv1) < 0 /*&& patience++ < PATIENCE*/);
-            rte_ring_enqueue(send_ring, recv1);
+            res = q12->dequeue(id);
+            q21->spinEnqueue(res, id);
         }
     }
-
-//    rte_mempool_put(message_pool, recv);
-    printf("Finished %u on intermediate\n", lcore_id);
-    return 0;
-}
-
-static int
-lcore_last(__attribute__((unused)) void *arg) {
-    unsigned lcore_id = rte_lcore_id();
-
-    printf("Starting core %u on last\n", lcore_id);
-    void *msg = nullptr;
-
-    int ret = 0;
-    if (rte_mempool_get(message_pool, &msg) < 0)
-        rte_panic("Failed to get message buffer\n");
-
-    snprintf((char *) msg, STR_TOKEN_SIZE, "%s", "starting");
-    ret = rte_ring_enqueue(send_ring, msg);
-    printf("Sent %s with status: %d on core: %d\n", (char *) msg, ret, lcore_id);
-
-    for (int j = 0; j < NUM_RUNS; j++) {
-        for (int i = 0; i < NUM_ITERS; i++) {
-            void *recv = nullptr;
-            while (rte_ring_dequeue(recv_ring, &recv) < 0 /*&& patience++ < PATIENCE*/);
-//            printf("core %u: Received '%s' %d\n", lcore_id, (char *) recv, patience);
-            rte_ring_enqueue(send_ring, recv);
-        }
-    }
-
-//    rte_mempool_put(message_pool, recv);
-    printf("Finished %u on last\n", lcore_id);
-    return 0;
-}
-
-int main(int argc, char **argv) {
-    const unsigned flags = 0;
-    const unsigned ring_size = 32768;
-    const unsigned pool_size = 16384;
-    const unsigned pool_cache = 128;
-    const unsigned priv_data_sz = 0;
-
-    int ret;
-    unsigned lcore_id;
-
-    bool intermediate = false;
-
-    /**
-     * Roundtrip: Primary > Intermediate > Last > Intermediate > Primary
-     */
-
-    if (argc == 5) { // Primary Process
-        ret = rte_eal_init(argc, argv);
-    } else if (argc == 7) { // Last Process
-        ret = rte_eal_init(6, argv);
-    } else { // Intermediate process
-        intermediate = true;
-        ret = rte_eal_init(6, argv);
-    }
-
-    if (ret < 0)
-        rte_exit(EXIT_FAILURE, "Cannot init EAL\n");
-
-    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        send_ring = rte_ring_create(_PRI_2_INTE, ring_size, rte_socket_id(), flags);
-        send_ring1 = rte_ring_create(_INTE_2_LAST, ring_size, rte_socket_id(), flags);
-        recv_ring1 = rte_ring_create(_LAST_2_INTE, ring_size, rte_socket_id(), flags);
-        recv_ring = rte_ring_create(_INTE_2_PRI, ring_size, rte_socket_id(), flags);
-
-        message_pool = rte_mempool_create(_MSG_POOL, pool_size,
-                                          STR_TOKEN_SIZE, pool_cache, priv_data_sz,
-                                          nullptr, nullptr, nullptr, nullptr,
-                                          rte_socket_id(), flags);
-    } else {
-        if (intermediate) {
-            recv_ring = rte_ring_lookup(_PRI_2_INTE);
-            send_ring1 = rte_ring_lookup(_INTE_2_LAST);
-            recv_ring1 = rte_ring_lookup(_LAST_2_INTE);
-            send_ring = rte_ring_lookup(_INTE_2_PRI);
-        } else {
-            recv_ring = rte_ring_lookup(_INTE_2_LAST);
-            send_ring = rte_ring_lookup(_LAST_2_INTE);
-            send_ring1 = send_ring;
-            recv_ring1 = recv_ring;
-        }
-        message_pool = rte_mempool_lookup(_MSG_POOL);
-    }
-    if (send_ring == nullptr || send_ring1 == nullptr)
-        rte_exit(EXIT_FAILURE, "Problem getting sending ring\n");
-    if (recv_ring == nullptr || recv_ring1 == nullptr)
-        rte_exit(EXIT_FAILURE, "Problem getting receiving ring\n");
-    if (message_pool == nullptr)
-        rte_exit(EXIT_FAILURE, "Problem getting message pool\n");
-
-    RTE_LOG(INFO, APP, "Finished Process Init.\n");
-
-    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-            rte_eal_remote_launch(lcore_primary, nullptr, lcore_id);
-        }
-    } else {
-        if (intermediate) {
-            RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-                rte_eal_remote_launch(lcore_intermediate, nullptr, lcore_id);
-            }
-        } else {
-            RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-                rte_eal_remote_launch(lcore_last, nullptr, lcore_id);
-            }
-        }
-    }
-
-    rte_eal_mp_wait_lcore();
+    printf("Verify: %llu\n", *res);
+    printf("Intermediate completed\n");
     return 0;
 }
