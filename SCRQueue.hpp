@@ -11,7 +11,7 @@ private:
     fixed_managed_shared_memory *main_pool;
     fixed_managed_shared_memory *mem_pool;
     EventCount *ev;
-    const int MAX_PATIENCE = 50;
+    const int MAX_PATIENCE = 1000;
 public:
     SCRQueue(fixed_managed_shared_memory *main_pool, fixed_managed_shared_memory *mem_pool, const int num_threads)
             : main_pool(main_pool), mem_pool(mem_pool) {
@@ -34,19 +34,20 @@ public:
     }
 
     inline T *dequeue(const int tid) {
-        T *temp = spinDequeue(tid);
+//        T *temp = spinDequeue(tid);
 
-        using Clock = std::chrono::system_clock;
+        /*using Clock = std::chrono::system_clock;
         using Duration = std::chrono::microseconds;
         auto start = Clock::now();
-        auto deadline = std::chrono::time_point_cast<Duration>(start + Duration(100));
-
+        auto deadline = std::chrono::time_point_cast<Duration>(start + Duration(100));*/
+        T *temp = queue->dequeue(tid);
         int patience = 0;
         if (temp == nullptr) {
             while (true) {
                 auto key = ev->prepareWait();
                 if (LIKELY((temp = queue->dequeue(tid)) == nullptr && patience++ < MAX_PATIENCE)) {
 //                    ev->waitUntil(key, deadline);
+//                    std::cout << "Waiting" << std::endl;
                     ev->wait(key);
                 } else {
                     ev->cancelWait();
