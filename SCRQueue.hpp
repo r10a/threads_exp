@@ -34,13 +34,19 @@ public:
     }
 
     inline T *dequeue(const int tid) {
+        /**
+         * Uncomment for spin-SCRQ
+         */
 //        T *temp = spinDequeue(tid);
+        /**
+         * Comment for spin-SCRQ
+         */
+        T *temp = queue->dequeue(tid);
 
         /*using Clock = std::chrono::system_clock;
         using Duration = std::chrono::microseconds;
         auto start = Clock::now();
         auto deadline = std::chrono::time_point_cast<Duration>(start + Duration(100));*/
-        T *temp = queue->dequeue(tid);
         int patience = 0;
         if (temp == nullptr) {
             while (true) {
@@ -65,18 +71,3 @@ public:
         return temp;
     }
 };
-
-/**
- if (res == nullptr) {
-                while (true) {
-                    auto key = ev->prepareWait();
-                    if ((res = q12->dequeue(id)) == nullptr) {
-//                    std::cout << "Waiting: " << id << std::endl;
-                        ev->wait(key);
-                    } else {
-                        ev->cancelWait();
-                        break;
-                    }
-                }
-            }
-*/
