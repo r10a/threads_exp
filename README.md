@@ -5,5 +5,6 @@ Relevent branches -
 - [MSQueue](https://github.com/r10a/threads_exp/tree/MSQueue)
 - [DPDK RTE_RING](https://github.com/r10a/threads_exp/tree/RTE_Ring)
 - [CRTurnQueue](https://github.com/r10a/threads_exp/tree/CRTQueue)
+- [SCRQueue](https://github.com/r10a/threads_exp/tree/SCRQueue)
 
 Please see individual branches for instructions on how to build/execute.
